@@ -1,10 +1,11 @@
 streamlit
-yfinance
+pyrebase4
+pycryptodome
+oauth2client
 firebase-admin
-pyrebase
 plotly
+yfinance
 pandas
 numpy
-cryptography
 requests
-pycryptodome
+cryptography
