@@ -1,11 +1,11 @@
 streamlit
 pyrebase4
-pycryptodome
-oauth2client
 firebase-admin
-plotly
+pycryptodome
+requests
+requests_toolbelt
 yfinance
 pandas
 numpy
-requests
+plotly
 cryptography
