@@ -1,11 +1,11 @@
 streamlit
-pyrebase4
-firebase-admin
-pycryptodome
-requests
-requests_toolbelt
 yfinance
 pandas
 numpy
 plotly
+finvizfinance
+firebase-admin
+pyrebase4
 cryptography
+streamlit-autorefresh
+setuptools
