@@ -1,0 +1,9 @@
+streamlit
+yfinance
+firebase-admin
+pyrebase
+plotly
+pandas
+numpy
+cryptography
+requests
