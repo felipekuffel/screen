@@ -55,6 +55,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+
 # --- Função de earnings detalhado ---
 def get_earnings_info_detalhado(ticker):
     try:
