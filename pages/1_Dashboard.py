@@ -462,21 +462,33 @@ def get_quarterly_growth_table_yfinance(ticker):
 
 
 threshold = st.sidebar.slider("⚡ Limite de momentum", 0.01, 0.2, 0.07)
-dias_breakout = st.sidebar.slider("\U0001F4C8 Breakout da máxima dos últimos X dias", 10, 60, 20)
-lookback = st.sidebar.slider("\U0001F4CA Candles recentes analisados", 3, 10, 5)
-sinal = st.sidebar.selectbox("\U0001F3AF Filtrar por sinal", ["Todos", "Ambos", "Momentum", "Breakout"])
-performance = st.sidebar.selectbox("\U0001F4CA Filtro de desempenho", [
-    "Quarter Up", "Quarter +10%", "Quarter +20%", "Quarter +30%", "Quarter +50%",
-    "Half Up", "Half +10%", "Half +20%", "Half +30%", "Half +50%", "Half +100%",
-    "Year Up", "Year +10%", "Year +20%", "Year +30%", "Year +50%", "Year +100%",
-    "Year +200%", "Year +300%", "Year +500%"], index=15)
-mostrar_vcp = st.sidebar.checkbox("\U0001F50E Mostrar apenas ativos com padrão VCP", value=False, key="checkbox_vcp")
-ordenamento_mm = st.sidebar.checkbox("\U0001F4D0 EMA20 > SMA50 > SMA150 > SMA200", value=False)
-sma200_crescente = st.sidebar.checkbox("\U0001F4C8 SMA200 maior que há 30 dias", value=False)
-executar = st.sidebar.button("\U0001F50D Iniciar análise")
-ticker_manual = st.sidebar.text_input("\U0001F4CC Ver gráfico de um ticker específico (ex: AAPL)", key="textinput_ticker_manual").upper()
-# Elementos finais da barra lateral
+dias_breakout = st.sidebar.slider("📈 Breakout da máxima dos últimos X dias", 10, 60, 20)
+lookback = st.sidebar.slider("📉 Candles recentes analisados", 3, 10, 5)
+sinal = st.sidebar.selectbox("🎯 Filtrar por sinal", ["Todos", "Ambos", "Momentum", "Breakout"])
+
+performance = st.sidebar.selectbox("📊 Filtro de desempenho",['Any', 'Today Up', 'Today Down', 'Today -15%', 'Today -10%', 'Today -5%', 'Today +5%', 'Today +10%', 'Today +15%', 'Week -30%', 'Week -20%', 'Week -10%', 'Week Down', 'Week Up', 'Week +10%', 'Week +20%', 'Week +30%', 'Month -50%', 'Month -30%', 'Month -20%', 'Month -10%', 'Month Down', 'Month Up', 'Month +10%', 'Month +20%', 'Month +30%', 'Month +50%', 'Quarter -50%', 'Quarter -30%', 'Quarter -20%', 'Quarter -10%', 'Quarter Down', 'Quarter Up', 'Quarter +10%', 'Quarter +20%', 'Quarter +30%', 'Quarter +50%', 'Half -75%', 'Half -50%', 'Half -30%', 'Half -20%', 'Half -10%', 'Half Down', 'Half Up', 'Half +10%', 'Half +20%', 'Half +30%', 'Half +50%', 'Half +100%', 'Year -75%', 'Year -50%', 'Year -30%', 'Year -20%', 'Year -10%', 'Year Down', 'Year Up', 'Year +10%', 'Year +20%', 'Year +30%', 'Year +50%', 'Year +100%', 'Year +200%', 'Year +300%', 'Year +500%', 'YTD -75%', 'YTD -50%', 'YTD -30%', 'YTD -20%', 'YTD -10%', 'YTD -5%', 'YTD Down', 'YTD Up', 'YTD +5%', 'YTD +10%', 'YTD +20%', 'YTD +30%', 'YTD +50%', 'YTD +100%'], index=15)
+
+change_filter = st.sidebar.selectbox("📉 Variação de Preço", ['Any', 'Up', 'Up 1%', 'Up 2%', 'Up 3%', 'Up 4%', 'Up 5%', 'Up 6%', 'Up 7%', 'Up 8%', 'Up 9%', 'Up 10%', 'Up 15%', 'Up 20%', 'Down', 'Down 1%', 'Down 2%', 'Down 3%', 'Down 4%', 'Down 5%', 'Down 6%', 'Down 7%', 'Down 8%', 'Down 9%', 'Down 10%', 'Down 15%', 'Down 20%'])
+highlow_filter = st.sidebar.selectbox("📊 52-Week High/Low", ['Any', 'New High', 'New Low', '5% or more below High', '10% or more below High', '15% or more below High', '20% or more below High', '30% or more below High', '40% or more below High', '50% or more below High', '60% or more below High', '70% or more below High', '80% or more below High', '90% or more below High', '0-3% below High', '0-5% below High', '0-10% below High', '5% or more above Low', '10% or more above Low', '15% or more above Low', '20% or more above Low', '30% or more above Low', '40% or more above Low', '50% or more above Low', '60% or more above Low', '70% or more above Low', '80% or more above Low', '90% or more above Low', '100% or more above Low', '120% or more above Low', '150% or more above Low', '200% or more above Low', '300% or more above Low', '500% or more above Low', '0-3% above Low', '0-5% above Low', '0-10% above Low'])
+volume_filter = st.sidebar.selectbox("🔊 Volume Médio", ["Over 300K", "Over 500K", "Over 1M", "Over 5M", "Over 10M"])
+
+mostrar_vcp = st.sidebar.checkbox("🔍 Mostrar apenas ativos com padrão VCP", value=False, key="checkbox_vcp")
+ordenamento_mm = st.sidebar.checkbox("📐 EMA20 > SMA50 > SMA150 > SMA200", value=False)
+sma200_crescente = st.sidebar.checkbox("📈 SMA200 maior que há 30 dias", value=False)
+executar = st.sidebar.button("🔎 Iniciar análise")
+
+ticker_manual = st.sidebar.text_input("📌 Ver gráfico de um ticker específico (ex: AAPL)", key="textinput_ticker_manual").upper()
+
 st.sidebar.markdown("---")
+
+filters_dict = {
+    "Performance": performance,
+    "Average Volume": volume_filter
+}
+if change_filter:
+    filters_dict["Change"] = change_filter
+if highlow_filter:
+    filters_dict["52-Week High/Low"] = highlow_filter
 
 
 # ✅ Botão de logout sempre visível
@@ -528,11 +540,13 @@ if executar:
     progress_bar = st.progress(0)
     f = io.StringIO()
 
+# Criação do dicionário de filtros dinâmicos já foi feita acima
     with redirect_stdout(f), redirect_stderr(f):
         with st.spinner("🔄 Buscando ativos..."):
             screener = Overview()
-            screener.set_filter(filters_dict={"Performance": performance, "Average Volume": "Over 300K"})
+            screener.set_filter(filters_dict=filters_dict)
             tickers_df = screener.screener_view()
+
 
     # Captura o log impresso pela finvizfinance
     log_output = f.getvalue()
@@ -689,6 +703,7 @@ if executar:
 
         progress.progress((i + 1) / len(tickers))
 
+   
     status_text.empty()
     progress.empty()
 
