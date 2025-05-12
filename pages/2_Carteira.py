@@ -255,26 +255,31 @@ with st.expander("📝 Nova Simulação de Compra", expanded=False):
     st.markdown("### 📋 Planejamento de Compras (Pré-visualização)")
     st.dataframe(df_preview, use_container_width=True, hide_index=True)
 
-    # 🔍 Análise de retorno e risco
+    # 🔍 Análise de retorno e risco (base real)
     risco_maximo_pct = st.session_state.get("risco_maximo_pct", 1.0)
     risco_max_total = pl_total * (risco_maximo_pct / 100)
+    venda_pct = st.session_state.get("venda_pct_live", 17.0)
 
-    # Total investido e unidades
+    lucro_total = 0
     total_valor = 0
     total_qtd = 0
-    for row in linhas:
-        valor = float(row[3].replace("$", "").replace(",", ""))
-        qtd = int(row[5].replace(" UN", ""))
+
+    for i in range(3):
+        subida = st.session_state.get(f"subida{i}", [0.0, 4.0, 10.0][i])
+        pct_pl = st.session_state.get(f"pct_pl{i}", [8.0, 6.0, 6.0][i])
+
+        preco = cotacao * (1 + subida / 100)
+        valor = pl_total * (pct_pl / 100)
+        qtd = valor / preco if preco else 0
+
         total_valor += valor
         total_qtd += qtd
 
-    # Preço alvo (venda) com base no ganho definido
-    venda_pct = st.session_state.get("venda_pct_live", 17.0)
     preco_final = cotacao * (1 + venda_pct / 100)
     lucro_total = (preco_final * total_qtd) - total_valor
     rr_ratio = lucro_total / risco_max_total if risco_max_total else 0
-
     pl_usado_pct = (total_valor / pl_total * 100) if pl_total else 0
+
 
     st.markdown("### 📉 Resumo da Operação")
     st.markdown(f"""
