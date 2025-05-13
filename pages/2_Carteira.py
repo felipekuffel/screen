@@ -567,7 +567,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                         with col1:
                             st.markdown(
                                 f"🛒 **Compra {i+1} ({c.get('etapa', '?')})** | "
-                                f"📅 {datetime.strptime(c.get('data', ''), '%Y-%m-%d').strftime('%d/%m/%Y') if c.get('data') else '—'} • "
+                                f"📅 {c['data']} • "
                                 f"🔢 {c['qtd']} ações • "
                                 f"💵 $ {c['preco']:.2f}"
                             )
