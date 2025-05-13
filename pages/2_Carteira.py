@@ -14,35 +14,7 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
     
-st.markdown("""
-    <style>
-    [data-testid="stSidebar"]::before {
-        content: "";
-        display: block;
-        height: 150px;
-        background-image: url('https://i.ibb.co/1tCRXfWv/404aabba-df44-4fc5-9c02-04d5b56108b9.png');
-        background-repeat: no-repeat;
-        background-position: center center;
-        background-size: contain;
-        margin-bottom: 0px;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-st.markdown("""
-    <div style="text-align: right; margin-top: -20px; margin-bottom: 20px;">
-        <img src="https://i.ibb.co/1tCRXfWv/404aabba-df44-4fc5-9c02-04d5b56108b9.png" width="120">
-        <h5 style="margin-top: 8px;">Salve seus registros de compras</h5>
-    </div>
-""", unsafe_allow_html=True)
-
-
-st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-    </style>
-""", unsafe_allow_html=True)
 
 try:
     key = st.secrets["firebase_admin"]["private_key"]
@@ -73,6 +45,36 @@ simulacoes_salvas = ref.get()
 if "simulacoes" not in st.session_state:
     st.session_state.simulacoes = simulacoes_salvas if simulacoes_salvas else []
 
+
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"]::before {
+        content: "";
+        display: block;
+        height: 150px;
+        background-image: url('https://i.ibb.co/1tCRXfWv/404aabba-df44-4fc5-9c02-04d5b56108b9.png');
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-size: contain;
+        margin-bottom: 0px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <div style="text-align: right; margin-top: -20px; margin-bottom: 20px;">
+        <img src="https://i.ibb.co/1tCRXfWv/404aabba-df44-4fc5-9c02-04d5b56108b9.png" width="120">
+        <h5 style="margin-top: 8px;">Salve seus registros de compras</h5>
+    </div>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 
 

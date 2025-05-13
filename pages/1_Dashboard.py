@@ -6,38 +6,26 @@ import numpy as np
 from finvizfinance.screener.overview import Overview
 import plotly.graph_objects as go
 import plotly.express as px
-import time
 from plotly.subplots import make_subplots
 import datetime
-import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth
-import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from cryptography.hazmat.primitives import serialization
 import io
-import sys
 from contextlib import redirect_stdout, redirect_stderr
 import re
 from finvizfinance.screener.overview import Overview
-import requests
 
-st.set_page_config(layout="wide")
-
-# 🔍 Debug visual para detectar reinício
-#st.markdown(f"🔄 Reinício em: `{datetime.datetime.now().strftime('%H:%M:%S')}`")
-
-# --- LOGIN: validação da sessão ---
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if "user" not in st.session_state or not st.session_state.logged_in:
+# Verifica se o usuário está autenticado
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
+    
 
-# --- Firebase Admin: inicialização segura ---
+
 try:
     key = st.secrets["firebase_admin"]["private_key"]
     serialization.load_pem_private_key(key.encode(), password=None)
@@ -55,10 +43,10 @@ if not firebase_admin._apps:
         st.error(f"Erro ao inicializar Firebase: {e}")
         st.stop()
 
-# --- Segurança adicional ---
-if "localId" not in st.session_state.user:
+if "user" not in st.session_state or "localId" not in st.session_state.user:
     st.error("Usuário não autenticado corretamente.")
     st.stop()
+
 
 # --- Estilo e cabeçalho ---
 st.markdown("""
