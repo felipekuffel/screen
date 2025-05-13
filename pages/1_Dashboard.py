@@ -16,7 +16,6 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from cryptography.hazmat.primitives import serialization
-from streamlit_autorefresh import st_autorefresh
 import io
 import sys
 from contextlib import redirect_stdout, redirect_stderr
@@ -26,12 +25,42 @@ import requests
 
 st.set_page_config(layout="wide")
 
-# Verifica se o usuário está autenticado
-if "logged_in" not in st.session_state or not st.session_state.logged_in:
+# 🔍 Debug visual para detectar reinício
+#st.markdown(f"🔄 Reinício em: `{datetime.datetime.now().strftime('%H:%M:%S')}`")
+
+# --- LOGIN: validação da sessão ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "user" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
 
+# --- Firebase Admin: inicialização segura ---
+try:
+    key = st.secrets["firebase_admin"]["private_key"]
+    serialization.load_pem_private_key(key.encode(), password=None)
+except Exception as e:
+    st.error(f"❌ Erro na chave privada: {e}")
+    st.stop()
+
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
+        firebase_admin.initialize_app(cred, {
+            "databaseURL": st.secrets["databaseURL"]
+        })
+    except Exception as e:
+        st.error(f"Erro ao inicializar Firebase: {e}")
+        st.stop()
+
+# --- Segurança adicional ---
+if "localId" not in st.session_state.user:
+    st.error("Usuário não autenticado corretamente.")
+    st.stop()
+
+# --- Estilo e cabeçalho ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"]::before {
@@ -53,7 +82,6 @@ st.markdown("""
         <h5 style="margin-top: 8px;">Realize a busca no menu lateral</h5>
     </div>
 """, unsafe_allow_html=True)
-
 
 
 # --- Função de earnings detalhado ---
@@ -491,12 +519,6 @@ if highlow_filter:
     filters_dict["52-Week High/Low"] = highlow_filter
 
 
-# ✅ Botão de logout sempre visível
-if st.sidebar.button("🚪 Sair"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
-
 
 def inserir_preco_no_meio(niveis: list, preco: float) -> pd.DataFrame:
     df = pd.DataFrame(niveis)
@@ -542,7 +564,7 @@ if executar:
 
 # Criação do dicionário de filtros dinâmicos já foi feita acima
     with redirect_stdout(f), redirect_stderr(f):
-        with st.spinner("🔄 Buscando ativos..."):
+        with st.spinner(" Buscando ativos..."):
             screener = Overview()
             screener.set_filter(filters_dict=filters_dict)
             tickers_df = screener.screener_view()

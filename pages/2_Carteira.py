@@ -73,6 +73,20 @@ simulacoes_salvas = ref.get()
 if "simulacoes" not in st.session_state:
     st.session_state.simulacoes = simulacoes_salvas if simulacoes_salvas else []
 
+
+
+
+@st.cache_data(ttl=10)
+def get_preco_atual(ticker):
+    import yfinance as yf
+    try:
+        return yf.Ticker(ticker).history(period="1d")["Close"].iloc[-1]
+    except:
+        return None
+
+
+
+
 def limpar_chaves_invalidas(obj, path="root"):
     if isinstance(obj, dict):
         novo = {}
@@ -147,12 +161,16 @@ else:
 
 
 
+with st.container():
+    st.markdown("""
+        <div style='background-color: #e6f7ff; padding: 1px; border-radius: 7px; border: 1px solid #b3d8ff;'>
+        <h4>📝 Novo Planejamento de Compra</h4>
+    """, unsafe_allow_html=True)
 
-with st.expander("📝 Nova Simulação de Compra", expanded=False):
+with st.expander("", expanded=False):
 
-    st.subheader("📌 Configuração das Compras")
     # Entradas dinâmicas com atualização imediata
-    col1, col2, col3, col4, col5= st.columns(5)
+    col1, col2, col3, col4, col5, col6= st.columns(6)
     with col1:
         nome_acao = st.text_input("🔹 Nome da Ação", nome_default, key="nome_acao_live")
     with col2:
@@ -163,14 +181,11 @@ with st.expander("📝 Nova Simulação de Compra", expanded=False):
         pl_total = st.number_input("💼 Capital Total (PL)", value=pl_total_default, step=100.0, key="pl_total_live")
     with col5:
         data_simulacao = st.date_input("📅 Data da Simulação", value=datetime.date.today(), key="data_simulacao_live")
+    with col6:
+        risco_maximo_pct = st.number_input("🔻 Risco máximo do PL (%)", value=1.0, step=0.1, key="risco_maximo_pct")
 
     st.markdown("---")
 
-    # Risco máximo configurável pelo usuário
-    risco_maximo_pct = st.number_input("🔻 Risco máximo da operação total em relação ao PL (%)", value=1.0, step=0.1, key="risco_maximo_pct")
-
-    st.markdown("---")
-    st.subheader("📌 Configuração das Compras")
 
     compra_data = []
     for i, nome in enumerate(["COMPRA INICIAL", "COMPRA 2", "COMPRA 3"]):
@@ -192,7 +207,7 @@ with st.expander("📝 Nova Simulação de Compra", expanded=False):
                     subida_padrao = [0.0, 4.0, 10.0][i]
                     subida_temp = st.session_state.get(f"subida{i}", subida_padrao)
                     preco_entrada = st.session_state.cotacao_live * (1 + subida_temp / 100)
-                    label_subida = f"🔼 % de Subida → ${preco_entrada:.2f}"
+                    label_subida = f"🔼 % de Subida da compra Anterior → ${preco_entrada:.2f}"
                     subida = st.number_input(label_subida, key=f"subida{i}", value=subida_temp, step=0.1)
 
             with col2:
@@ -200,7 +215,7 @@ with st.expander("📝 Nova Simulação de Compra", expanded=False):
                 pct_pl_temp = st.session_state.get(f"pct_pl{i}", pct_pl_padrao)
                 valor_investido = st.session_state.pl_total_live * (pct_pl_temp / 100)
                 qtd_calculada = valor_investido / preco_entrada if preco_entrada else 0
-                label_pl = f"📊 % do PL (Qtd: {int(qtd_calculada)} UN)"
+                label_pl = f"📊 % do PL neste compra (Qtd: {int(qtd_calculada)} UN)"
                 pct_pl = st.number_input(label_pl, key=f"pct_pl{i}", value=pct_pl_temp, step=0.1)
 
             with col3:
@@ -254,7 +269,7 @@ with st.expander("📝 Nova Simulação de Compra", expanded=False):
 
     st.markdown("### 📋 Planejamento de Compras (Pré-visualização)")
     st.dataframe(df_preview, use_container_width=True, hide_index=True)
-
+    st.markdown("</div>", unsafe_allow_html=True)
     # 🔍 Análise de retorno e risco (base real)
     risco_maximo_pct = st.session_state.get("risco_maximo_pct", 1.0)
     risco_max_total = pl_total * (risco_maximo_pct / 100)
@@ -297,9 +312,9 @@ with st.expander("📝 Nova Simulação de Compra", expanded=False):
     
 
     # ✅ Apenas o botão fica dentro do form
+    
     with st.form("form_compras_final"):
-        enviado = st.form_submit_button("📥 Confirmar Planejamento de Compras")
-
+        enviado = st.form_submit_button("📥 Confirmar Planejamento de Compras", type="primary")
     # Processamento
     if enviado:
         preco_final = st.session_state.cotacao_live * (1 + st.session_state.venda_pct_live / 100)
@@ -454,16 +469,16 @@ if enviado:
 st.markdown("---")
 st.subheader("📈 Simulações em Aberto")
 
+if st.button("🔄 Atualizar preços"):
+    st.cache_data.clear()
+    st.rerun()
+
 for idx, sim in enumerate(st.session_state.simulacoes):
     preco_medio = sim.get("preco_medio", 0)
     preco_final = sim.get("preco_final", 0)
 
-    try:
-        import yfinance as yf
-        ticker = yf.Ticker(sim["nome"])
-        valor_atual = ticker.history(period="1d")["Close"].iloc[-1]
-    except Exception:
-        valor_atual = preco_medio
+    valor_atual = get_preco_atual(sim["nome"]) or sim.get("preco_medio", 0)
+
 
     progresso_pct = (valor_atual / preco_medio - 1) * 100 if preco_medio else 0
     progresso_ate_meta = ((valor_atual - preco_medio) / (preco_final - preco_medio)) * 100 if (preco_final - preco_medio) else 0
@@ -473,25 +488,29 @@ for idx, sim in enumerate(st.session_state.simulacoes):
     icone_progresso = "🔼" if progresso_pct >= 0 else "🔽"
 
     alerta = ""
-    try:
-        compra_2_pct = float(sim["tabela"]["% PARA COMPRA"][1].replace('%', ''))
-        compra_3_pct = float(sim["tabela"]["% PARA COMPRA"][2].replace('%', ''))
-        preco_2 = sim["cotacao"] * (1 + compra_2_pct / 100)
-        preco_3 = sim["cotacao"] * (1 + compra_3_pct / 100)
+   
+    compra_2_pct = float(sim["tabela"]["% PARA COMPRA"][1].replace('%', ''))
+    compra_3_pct = float(sim["tabela"]["% PARA COMPRA"][2].replace('%', ''))
+    preco_2 = sim["cotacao"] * (1 + compra_2_pct / 100)
+    preco_3 = sim["cotacao"] * (1 + compra_3_pct / 100)
 
-        if valor_atual < preco_2:
-            alerta = "🟢 Em faixa da COMPRA INICIAL"
-        elif valor_atual < preco_3:
-            alerta = "🟡 Em faixa da COMPRA 2"
-        else:
-            alerta = "🟠 Em faixa da COMPRA 3 ou acima"
-    except:
-        pass
+    if valor_atual < preco_2:
+        alerta = "🟢 Em faixa da COMPRA INICIAL"
+        falta_pct = (preco_2 - valor_atual) / valor_atual * 100
+        aviso_proxima = f"🟡 Falta subir {falta_pct:.2f}% (R$ {preco_2:.2f}) para COMPRA 2"
+    elif valor_atual < preco_3:
+        alerta = "🟡 Em faixa da COMPRA 2"
+        falta_pct = (preco_3 - valor_atual) / valor_atual * 100
+        aviso_proxima = f"🟠 Falta subir {falta_pct:.2f}% (R$ {preco_3:.2f}) para COMPRA 3"
+    else:
+        alerta = "🟠 Em faixa da COMPRA 3 ou acima"
+        aviso_proxima = ""
 
     destaque_cor = "#e6fff2"
     if valor_atual >= preco_final:
         alerta = "🎉 Preço atual ultrapassou o alvo!"
         destaque_cor = "#fff3cd"
+        aviso_proxima = ""
 
     
         # 🔍 Etapa atual (para inline)
@@ -507,36 +526,51 @@ for idx, sim in enumerate(st.session_state.simulacoes):
 
     expander_aberto = st.session_state.get("keep_open_idx") == idx
     with st.expander(
-        f"📈 {sim['nome']}  •  Alvo:  {preco_final:.2f} (+{sim['venda_pct']:.1f}% ) •  Lucro: ${sim['lucro']:.2f}  •  Progresso: {progresso_ate_meta:.1f}%  •  Falta subir: {restante_para_meta:.1f}%  •  {alerta} • {aviso_etapa_inline}",
+        f"📈 {sim['nome']}  {valor_atual:.2f} ({progresso_pct:.2f}% ) {aviso_proxima} • 🎯 Alvo:  {preco_final:.2f} (+{sim['venda_pct']:.1f}% ) •  Falta subir: {restante_para_meta:.1f}% até o alvo •  {alerta} • {aviso_etapa_inline}  •  Progresso Geral: {progresso_ate_meta:.1f}% ",
         expanded=expander_aberto,
     ):
-        st.markdown(f"""
-        <div style='padding: 1rem; background-color: {destaque_cor}; border-radius: 10px; font-size: 16px;'>
-            <p><strong>💰 Preço Médio:</strong> $ {preco_medio:.2f} &nbsp;&nbsp;|&nbsp;&nbsp; 
-            <strong>💵 Preço Atual:</strong> $ {valor_atual:.2f} &nbsp;&nbsp;|&nbsp;&nbsp; 
-            <strong>🎯 Meta de Venda:</strong> $ {preco_final:.2f} &nbsp;&nbsp;|&nbsp;&nbsp; 
-            <strong>📊 Variação Atual:</strong> {progresso_pct:.2f}%<>
-            <strong>📈 Progresso até a Meta:</strong> <span style='color: {cor_progresso};'>{icone_progresso} {progresso_ate_meta:.2f}%</span> &nbsp;&nbsp;•&nbsp;&nbsp; <strong>🔺 Falta subir:</strong> {restante_para_meta:.2f}% &nbsp;&nbsp; {alerta}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
+        
         st.progress(max(0.0, min(progresso_ate_meta / 100, 1.0)))
 
        
 
         
 
-        st.dataframe(pd.DataFrame(sim["tabela"], columns=sim["tabela"].keys()), use_container_width=True, hide_index=True)
+        # Carrega a tabela como DataFrame
+        tabela_df = pd.DataFrame(sim["tabela"])
+
+        # Lista completa das colunas esperadas
+        colunas_desejadas = [
+            "Etapa", "ADD", "% PARA COMPRA", "COMPRA PL", "% PL COMPRA",
+            "QTD", "STOP", "$ STOP", "RISCO", "$ RISCO"
+        ]
+
+        # Verifica quais colunas estão realmente presentes
+        colunas_existentes = [col for col in colunas_desejadas if col in tabela_df.columns]
+
+        # Exibe a tabela com as colunas disponíveis, na ordem correta
+        st.dataframe(tabela_df[colunas_existentes], use_container_width=True, hide_index=True)
+
+        risco_maximo_valor = sim["pl_total"] * (sim.get("risco_maximo_pct", 1.0) / 100)
+        risco_maximo_pct = sim.get("risco_maximo_pct", 1.0)
+        risco_maximo_valor = sim["pl_total"] * (risco_maximo_pct / 100)
+        lucro = sim.get("lucro", 0)
+        rr_ratio = lucro / risco_maximo_valor if risco_maximo_valor else 0
 
         st.markdown(f"""
         <div style='padding: 1rem; background-color: #f0f2f6; border-radius: 10px; font-size: 16px;'>
         <p><strong>Objetivos da Operação:</strong>&nbsp;&nbsp;
-        <strong>📦 Qtd total:</strong> {int(sim['total_unidades'])} ações &nbsp;&nbsp;|&nbsp;&nbsp;
+        <strong>📦 Qtd Final:</strong> {int(sim['total_unidades'])} ações &nbsp;&nbsp;|&nbsp;&nbsp;
         <strong>💼 Total investido:</strong> $ {sim['total_valor']:.2f} &nbsp;&nbsp;|&nbsp;&nbsp;
-        <strong>📊 Lucro estimado:</strong> $ {sim['lucro']:.2f} ({sim['lucro_pct']:.2f}%) &nbsp;&nbsp;|&nbsp;&nbsp;
-        <strong>L/PL:</strong> {sim['lpl_pct']:.2f}%</p>
+        <strong>📊 Lucro:</strong> $ {lucro:.2f} ({sim['lucro_pct']:.2f}%) &nbsp;&nbsp;|&nbsp;&nbsp;
+        <strong>L/PL:</strong> {sim['lpl_pct']:.2f}% &nbsp;&nbsp;|&nbsp;&nbsp;
+        <strong>🔻 Risco:</strong> $ {risco_maximo_valor:.2f} ({risco_maximo_pct:.2f}%) &nbsp;&nbsp;|&nbsp;&nbsp;
+        <strong>📈 R/R:</strong> {rr_ratio:.2f}
+        </p>
         </div>
         """, unsafe_allow_html=True)
+
+
         st.markdown(f"")
         col_hist, col_botoes = st.columns([2, 3])
 
@@ -547,10 +581,12 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                 total_investido = sum([c["preco"] * c["qtd"] for c in sim["compras_reais"]])
 
                 st.markdown("""
+                <div style='padding: 1rem; background-color: #f8f9fa; border-radius: 10px; font-size: 22px;'>
+                    <p><strong>🛒 Carteira Atual</strong>
                 <div style='padding: 1rem; background-color: #f8f9fa; border-radius: 10px; font-size: 16px;'>
-                    <p><strong>📦 Ações disponíveis para venda:</strong> {disponivel} ações</p>
-                    <p><strong>💰 Preço médio acumulado:</strong> $ {preco:.2f}</p>
-                    <p><strong>💸 Total investido nas compras reais:</strong> $ {investido:.2f}</p>
+                    <p><strong>📦 Ações disponíveis para venda:</strong> {disponivel} ações
+                    <p><strong>💰 Preço médio acumulado:</strong> $ {preco:.2f}
+                    <p><strong>💸 Total investido nas compras reais:</strong> $ {investido:.2f}
                 </div>
                 """.format(disponivel=total_disponivel, preco=preco_medio, investido=total_investido), unsafe_allow_html=True)
 
