@@ -499,11 +499,11 @@ for idx, sim in enumerate(st.session_state.simulacoes):
     if valor_atual < preco_2:
         alerta = "🟢 Em faixa da COMPRA INICIAL"
         falta_pct = (preco_2 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"🟡 Falta subir {falta_pct:.2f}% (R$ {preco_2:.2f}) para COMPRA 2"
+        aviso_proxima = f"🟢 Falta subir {falta_pct:.2f}% (R$ {preco_2:.2f}) para COMPRA 2"
     elif valor_atual < preco_3:
         alerta = "🟡 Em faixa da COMPRA 2"
         falta_pct = (preco_3 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"🟠 Falta subir {falta_pct:.2f}% (R$ {preco_3:.2f}) para COMPRA 3"
+        aviso_proxima = f"🟡Falta subir {falta_pct:.2f}% (R$ {preco_3:.2f}) para COMPRA 3"
     else:
         alerta = "🟠 Em faixa da COMPRA 3 ou acima"
         aviso_proxima = ""
@@ -528,7 +528,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
 
     expander_aberto = st.session_state.get("keep_open_idx") == idx
     with st.expander(
-        f"📈 {sim['nome']}  {valor_atual:.2f} ({progresso_pct:.2f}% ) {aviso_proxima} • 🎯 Alvo:  {preco_final:.2f} (+{sim['venda_pct']:.1f}% ) •  Falta subir: {restante_para_meta:.1f}% até o alvo •  {alerta} • {aviso_etapa_inline}  •  Progresso Geral: {progresso_ate_meta:.1f}% ",
+        f"📈 {sim['nome']}  {valor_atual:.2f} ({progresso_pct:.2f}% ) {aviso_proxima} e  {restante_para_meta:.1f}% até o alvo 🎯 ( {preco_final:.2f} - +{sim['venda_pct']:.1f}% ) • {aviso_etapa_inline}  •  Progresso Geral: {progresso_ate_meta:.1f}% ",
         expanded=expander_aberto,
     ):
         
