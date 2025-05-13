@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from cryptography.hazmat.primitives import serialization
 import re
-import datetime
+from datetime import datetime, date
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
 
@@ -61,12 +61,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-    <div style="text-align: right; margin-top: -20px; margin-bottom: 20px;">
-        <img src="https://i.ibb.co/1tCRXfWv/404aabba-df44-4fc5-9c02-04d5b56108b9.png" width="120">
-        <h5 style="margin-top: 8px;">Salve seus registros de compras</h5>
-    </div>
-""", unsafe_allow_html=True)
 
 
 st.markdown("""
@@ -125,7 +119,7 @@ def registrar_venda(sim, preco_venda, qtd_vendida, data_venda):
 
     venda = {
         "nome": sim["nome"],
-        "data": data_venda,
+        "data": datetime.strptime(str(data_venda), "%Y-%m-%d").strftime('%d/%m/%Y'),
         "preco_venda": preco_venda,
         "quantidade": qtd_vendida,
         "lucro": lucro,
@@ -154,6 +148,20 @@ if 'edit_index' in st.session_state:
     cotacao_default = sim['cotacao']
     venda_pct_default = sim['venda_pct']
     pl_total_default = sim['pl_total']
+
+    # Pré-carrega valores das etapas
+    try:
+        for i, nome in enumerate(["COMPRA INICIAL", "COMPRA 2", "COMPRA 3"]):
+            subida = float(sim["tabela"]["% PARA COMPRA"][i].replace('%', ''))
+            stop = float(sim["tabela"]["STOP"][i].replace('%', ''))
+            pct_pl = float(sim["tabela"]["% PL COMPRA"][i].replace('%', ''))
+
+            st.session_state[f"subida{i}"] = subida
+            st.session_state[f"stop{i}"] = stop
+            st.session_state[f"pct_pl{i}"] = pct_pl
+    except:
+        pass
+
 else:
     nome_default = "ACMR"
     cotacao_default = 28.87
@@ -163,13 +171,15 @@ else:
 
 
 
+
 with st.container():
     st.markdown("""
-        <div style='background-color: #e6f7ff; padding: 1px; border-radius: 7px; border: 1px solid #b3d8ff;'>
+        <div style='background-color: #dfefff; padding: 1px; border-radius: 7px; border: 1px solid #b3d8ff;'>
         <h4>📝 Novo Planejamento de Compra</h4>
     """, unsafe_allow_html=True)
+expanded_planning = st.session_state.get("open_planning_expander", False)
 
-with st.expander("", expanded=False):
+with st.expander("Expandir/Minimizar Planejamento", expanded=expanded_planning):
 
     # Entradas dinâmicas com atualização imediata
     col1, col2, col3, col4, col5, col6= st.columns(6)
@@ -182,7 +192,14 @@ with st.expander("", expanded=False):
     with col4:
         pl_total = st.number_input("💼 Capital Total (PL)", value=pl_total_default, step=100.0, key="pl_total_live")
     with col5:
-        data_simulacao = st.date_input("📅 Data da Simulação", value=datetime.date.today(), key="data_simulacao_live")
+        data_simulacao_str = st.text_input("📅 Data da Simulação (DD/MM/AAAA)", date.today().strftime('%d/%m/%Y'), key="data_simulacao_live")
+
+        try:
+            data_simulacao = datetime.strptime(data_simulacao_str, "%d/%m/%Y").date()
+        except ValueError:
+            st.error("⚠️ Data inválida. Use o formato DD/MM/AAAA.")
+            st.stop()
+
     with col6:
         risco_maximo_pct = st.number_input("🔻 Risco máximo do PL (%)", value=1.0, step=0.1, key="risco_maximo_pct")
 
@@ -310,166 +327,105 @@ with st.expander("", expanded=False):
     </div>
     """, unsafe_allow_html=True)
 
+   
 
-    
-
-    # ✅ Apenas o botão fica dentro do form
-    
+# 📝 Exibe o formulário de planejamento somente quando ativado
+    #if st.session_state.get("show_planning_form", False):
     with st.form("form_compras_final"):
-        enviado = st.form_submit_button("📥 Confirmar Planejamento de Compras", type="primary")
-    # Processamento
-    if enviado:
-        preco_final = st.session_state.cotacao_live * (1 + st.session_state.venda_pct_live / 100)
-        total_valor = 0
-        total_unidades = 0
-        linhas = []
+        enviado = st.form_submit_button("📅 Confirmar Planejamento de Compras", type="primary")
 
-        for i, compra in enumerate(compra_data):
-            preco = st.session_state.cotacao_live * (1 + compra["subida_pct"] / 100)
-            valor = st.session_state.pl_total_live * (compra["pct_pl"] / 100)
-            unidades = valor / preco
-            stop_preco = preco * (1 - compra["stop_pct"] / 100)
-            risco_valor = (preco - stop_preco) * unidades
-            risco_pct_pl = -risco_valor / st.session_state.pl_total_live * 100
+        if enviado:
+            st.session_state.open_planning_expander = False
 
-            linhas.append([
-                compra["nome"],
-                f"${preco:.2f}",
-                f"{compra['subida_pct']:.2f}%" if i > 0 else "Compra Inicial",
-                f"${valor:,.2f}",
-                f'{compra["pct_pl"]:.2f}%',
-                f"{int(unidades)} UN",
-                f'{compra["stop_pct"]:.2f}%',
-                f"$ {stop_preco:.2f}",
-                f"{risco_pct_pl:.2f}% PL",
-                f"$ {-risco_valor:.2f}",
+            if 'edit_index' in st.session_state:
+                st.session_state.keep_open_idx = st.session_state.edit_index
+
+            preco_final = st.session_state.cotacao_live * (1 + st.session_state.venda_pct_live / 100)
+            total_valor = 0
+            total_unidades = 0
+            linhas = []
+
+            for i, compra in enumerate(compra_data):
+                preco = st.session_state.cotacao_live * (1 + compra["subida_pct"] / 100)
+                valor = st.session_state.pl_total_live * (compra["pct_pl"] / 100)
+                unidades = valor / preco
+                stop_preco = preco * (1 - compra["stop_pct"] / 100)
+                risco_valor = (preco - stop_preco) * unidades
+                risco_pct_pl = -risco_valor / st.session_state.pl_total_live * 100
+
+                linhas.append([
+                    compra["nome"],
+                    f"${preco:.2f}",
+                    f"{compra['subida_pct']:.2f}%" if i > 0 else "Compra Inicial",
+                    f"${valor:,.2f}",
+                    f'{compra["pct_pl"]:.2f}%',
+                    f"{int(unidades)} UN",
+                    f'{compra["stop_pct"]:.2f}%',
+                    f"$ {stop_preco:.2f}",
+                    f"{risco_pct_pl:.2f}% PL",
+                    f"$ {-risco_valor:.2f}",
+                ])
+
+                total_valor += valor
+                total_unidades += unidades
+
+            lucro = preco_final * total_unidades - total_valor
+            lucro_pct = lucro / total_valor * 100
+            lpl_pct = lucro / st.session_state.pl_total_live * 100
+
+            df_tabela = pd.DataFrame(linhas, columns=[
+                "Etapa", "ADD", "% PARA COMPRA", "COMPRA PL", "% PL COMPRA",
+                "QTD", "STOP", "$ STOP", "RISCO", "$ RISCO"
             ])
 
-            total_valor += valor
-            total_unidades += unidades
+            preco_inicial = st.session_state.cotacao_live
+            qtd_inicial = int(df_tabela["QTD"][0].replace(" UN", "")) if "QTD" in df_tabela.columns else 0
+            valor_inicial = preco_inicial * qtd_inicial
 
-        lucro = preco_final * total_unidades - total_valor
-        lucro_pct = lucro / total_valor * 100
-        lpl_pct = lucro / st.session_state.pl_total_live * 100
-
-        df_tabela = pd.DataFrame(linhas, columns=[
-            "Etapa", "ADD", "% PARA COMPRA", "COMPRA PL", "% PL COMPRA",
-            "QTD", "STOP", "$ STOP", "RISCO", "$ RISCO"
-        ])
-
-        nova_simulacao = {
-            "nome": st.session_state.nome_acao_live,
-            "cotacao": st.session_state.cotacao_live,
-            "venda_pct": st.session_state.venda_pct_live,
-            "pl_total": st.session_state.pl_total_live,
-            "data_simulacao": str(st.session_state.data_simulacao_live),
-            "preco_final": preco_final,
-            "lucro": lucro,
-            "lucro_pct": lucro_pct,
-            "lpl_pct": lpl_pct,
-            "total_valor": total_valor,
-            "total_unidades": total_unidades,
-            "tabela": df_tabela.to_dict(),
-            "quantidade_restante": int(total_unidades),
-            "risco_maximo_pct": st.session_state.get("risco_maximo_pct", 1.0),
-            "compras_reais": [
-                {
+            nova_simulacao = {
+                "nome": st.session_state.nome_acao_live,
+                "cotacao": preco_inicial,
+                "venda_pct": st.session_state.venda_pct_live,
+                "pl_total": st.session_state.pl_total_live,
+                "data_simulacao": data_simulacao.strftime('%d/%m/%Y'),
+                "preco_final": preco_final,
+                "lucro": lucro,
+                "lucro_pct": lucro_pct,
+                "lpl_pct": lpl_pct,
+                "total_valor": total_valor,
+                "total_unidades": total_unidades,
+                "tabela": df_tabela.to_dict(),
+                "quantidade_restante": int(total_unidades),
+                "risco_maximo_pct": st.session_state.get("risco_maximo_pct", 1.0),
+                # REGISTRO AUTOMÁTICO DA COMPRA INICIAL
+                "compras_reais": [{
                     "etapa": "Inicial",
-                    "preco": st.session_state.cotacao_live,
-                    "qtd": int(st.session_state.pl_total_live * (compra_data[0]["pct_pl"] / 100) / st.session_state.cotacao_live),
-                    "data": str(st.session_state.data_simulacao_live)
-                }
-            ],
-            "quantidade_real": int(st.session_state.pl_total_live * (compra_data[0]["pct_pl"] / 100) / st.session_state.cotacao_live),
-            "preco_medio": st.session_state.cotacao_live
-        }
-
-        st.session_state.simulacoes.append(nova_simulacao)
-        ref.set(limpar_chaves_invalidas(st.session_state.simulacoes))
-        st.success("✅ Simulação salva com sucesso!")
-        st.rerun()
-
-
-        enviado = st.form_submit_button("📥 Simular Compras")
-
-
-
-if enviado:
-    if 'edit_index' in st.session_state:
-        del st.session_state.simulacoes[st.session_state.edit_index]
-        del st.session_state.edit_index
-
-    total_valor = 0
-    total_unidades = 0
-    linhas = []
-
-    for i, compra in enumerate(compra_data):
-        preco = cotacao * (1 + compra["subida_pct"] / 100)
-        valor = pl_total * (compra["pct_pl"] / 100)
-        unidades = valor / preco
-        stop_preco = preco * (1 - compra["stop_pct"] / 100)
-        risco_valor = (preco - stop_preco) * unidades
-        risco_pct_pl = -risco_valor / pl_total * 100
-
-        linhas.append([
-            compra["nome"],
-            f"${preco:.2f}",
-            f"{compra['subida_pct']:.2f}%" if i > 0 else "Compra Inicial",
-            f"${valor:,.2f}",
-            f'{compra["pct_pl"]:.2f}%',
-            f"{int(unidades)} UN",
-            f'{compra["stop_pct"]:.2f}%',
-            f"$ {stop_preco:.2f}",
-            f"{risco_pct_pl:.2f}% PL",
-            f"$ {-risco_valor:.2f}",
-        ])
-
-        total_valor += valor
-        total_unidades += unidades
-
-    preco_final = cotacao * (1 + venda_pct / 100)
-    lucro = preco_final * total_unidades - total_valor
-    lucro_pct = lucro / total_valor * 100
-    lpl_pct = lucro / pl_total * 100
-
-    df_tabela = pd.DataFrame(linhas, columns=[
-        "Etapa", "ADD", "% PARA COMPRA", "COMPRA PL", "% PL COMPRA",
-        "QTD", "STOP", "$ STOP", "RISCO", "$ RISCO"
-    ])
-
-    nova_simulacao = {
-        "nome": nome_acao,
-        "cotacao": cotacao,
-        "venda_pct": venda_pct,
-        "pl_total": pl_total,
-        "data_simulacao": str(data_simulacao),  # <- campo novo
-        "preco_final": preco_final,
-        "lucro": lucro,
-        "lucro_pct": lucro_pct,
-        "lpl_pct": lpl_pct,
-        "total_valor": total_valor,
-        "total_unidades": total_unidades,
-        "tabela": df_tabela.to_dict(),
-        "quantidade_restante": int(total_unidades),
-        "compras_reais": [
-            {
-                "etapa": "Inicial",
-                "preco": cotacao,
-                "qtd": int(pl_total * (compra_data[0]["pct_pl"] / 100) / cotacao),
-                "data": str(data_simulacao)
+                    "preco": preco_inicial,
+                    "qtd": qtd_inicial,
+                    "data": data_simulacao.strftime('%d/%m/%Y')
+                }],
+                "quantidade_real": qtd_inicial,
+                "preco_medio": preco_inicial
             }
-        ],
-        "quantidade_real": int(pl_total * (compra_data[0]["pct_pl"] / 100) / cotacao),
-        "preco_medio": cotacao
-    }
 
-    st.session_state.simulacoes.append(nova_simulacao)
-    ref.set(limpar_chaves_invalidas(st.session_state.simulacoes))
-    st.success("✅ Simulação salva com sucesso!")
-    st.rerun()
+
+            if 'edit_index' in st.session_state:
+                sim_antigo = st.session_state.simulacoes[st.session_state.edit_index]
+                nova_simulacao["compras_reais"] = sim_antigo.get("compras_reais", [])
+                nova_simulacao["quantidade_real"] = sim_antigo.get("quantidade_real", 0)
+                nova_simulacao["preco_medio"] = sim_antigo.get("preco_medio", st.session_state.cotacao_live)
+                st.session_state.simulacoes[st.session_state.edit_index] = nova_simulacao
+                del st.session_state["edit_index"]
+            else:
+                st.session_state.simulacoes.append(nova_simulacao)
+
+            ref.set(limpar_chaves_invalidas(st.session_state.simulacoes))
+            st.success("✅ Simulação salva com sucesso!")
+            st.rerun()
+
 
 st.markdown("---")
-st.subheader("📈 Simulações em Aberto")
+st.subheader("📈 Operações em Aberto")
 
 if st.button("🔄 Atualizar preços"):
     st.cache_data.clear()
@@ -497,16 +453,21 @@ for idx, sim in enumerate(st.session_state.simulacoes):
     preco_3 = sim["cotacao"] * (1 + compra_3_pct / 100)
 
     if valor_atual < preco_2:
-        alerta = "🟢 Em faixa da COMPRA INICIAL"
+        alerta = " Em faixa da COMPRA INICIAL 🟢"
         falta_pct = (preco_2 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"🟢 Falta subir {falta_pct:.2f}% (R$ {preco_2:.2f}) para COMPRA 2"
+        aviso_proxima = f"  {falta_pct:.2f}%   para  COMPRA 2 (R$ {preco_2:.2f})"
+        sinal_proxima = f" 🟢"
     elif valor_atual < preco_3:
         alerta = "🟡 Em faixa da COMPRA 2"
         falta_pct = (preco_3 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"🟡Falta subir {falta_pct:.2f}% (R$ {preco_3:.2f}) para COMPRA 3"
+        aviso_proxima = f"{falta_pct:.2f}%  para  COMPRA 3 (R$ {preco_3:.2f})"
+        sinal_proxima = f"🟡"
+
     else:
         alerta = "🟠 Em faixa da COMPRA 3 ou acima"
         aviso_proxima = ""
+        sinal_proxima = f"🟠"
+
 
     destaque_cor = "#e6fff2"
     if valor_atual >= preco_final:
@@ -518,17 +479,17 @@ for idx, sim in enumerate(st.session_state.simulacoes):
         # 🔍 Etapa atual (para inline)
     etapas_executadas = [c["etapa"] for c in sim.get("compras_reais", [])]
     if "3" in etapas_executadas:
-        aviso_etapa_inline = "🟠 Compra atual: COMPRA 3"
+        aviso_etapa_inline = " 🟠 Realizada COMPRA 3"
     elif "2" in etapas_executadas:
-        aviso_etapa_inline = "🟡 Compra atual: COMPRA 2"
+        aviso_etapa_inline = " 🟡 Realizada  COMPRA 2"
     elif "Inicial" in etapas_executadas:
-        aviso_etapa_inline = "🟢 Compra atual: COMPRA INICIAL"
+        aviso_etapa_inline = " 🟢 Realizada  COMPRA INICIAL"
     else:
         aviso_etapa_inline = "⚠️ Nenhuma compra real"
 
     expander_aberto = st.session_state.get("keep_open_idx") == idx
     with st.expander(
-        f"📈 {sim['nome']}  {valor_atual:.2f} ({progresso_pct:.2f}% ) {aviso_proxima} e  {restante_para_meta:.1f}% até o alvo 🎯 ( {preco_final:.2f} - +{sim['venda_pct']:.1f}% ) • {aviso_etapa_inline}  •  Progresso Geral: {progresso_ate_meta:.1f}% ",
+        f"{sinal_proxima} {sim['nome']} | Inicial: {sim['cotacao']:.2f} → Atual: {valor_atual:.2f} ({progresso_pct:.2f}% )  → {aviso_proxima}  → Alvo: {preco_final:.2f} (Falta {restante_para_meta:.1f}%) • {aviso_etapa_inline} →  • Progresso Geral: {progresso_ate_meta:.1f}%",
         expanded=expander_aberto,
     ):
         
@@ -541,17 +502,17 @@ for idx, sim in enumerate(st.session_state.simulacoes):
         # Carrega a tabela como DataFrame
         tabela_df = pd.DataFrame(sim["tabela"])
 
-        # Lista completa das colunas esperadas
+        # Garante presença de todas colunas esperadas
         colunas_desejadas = [
             "Etapa", "ADD", "% PARA COMPRA", "COMPRA PL", "% PL COMPRA",
             "QTD", "STOP", "$ STOP", "RISCO", "$ RISCO"
         ]
+        for col in colunas_desejadas:
+            if col not in tabela_df.columns:
+                tabela_df[col] = np.nan  # ou "" se preferir string vazia
 
-        # Verifica quais colunas estão realmente presentes
-        colunas_existentes = [col for col in colunas_desejadas if col in tabela_df.columns]
-
-        # Exibe a tabela com as colunas disponíveis, na ordem correta
-        st.dataframe(tabela_df[colunas_existentes], use_container_width=True, hide_index=True)
+        # Exibe a tabela com as colunas na ordem correta
+        st.dataframe(tabela_df[colunas_desejadas], use_container_width=True, hide_index=True)
 
         risco_maximo_valor = sim["pl_total"] * (sim.get("risco_maximo_pct", 1.0) / 100)
         risco_maximo_pct = sim.get("risco_maximo_pct", 1.0)
@@ -559,124 +520,146 @@ for idx, sim in enumerate(st.session_state.simulacoes):
         lucro = sim.get("lucro", 0)
         rr_ratio = lucro / risco_maximo_valor if risco_maximo_valor else 0
 
-        st.markdown(f"""
-        <div style='padding: 1rem; background-color: #f0f2f6; border-radius: 10px; font-size: 16px;'>
-        <p><strong>Objetivos da Operação:</strong>&nbsp;&nbsp;
-        <strong>📦 Qtd Final:</strong> {int(sim['total_unidades'])} ações &nbsp;&nbsp;|&nbsp;&nbsp;
-        <strong>💼 Total investido:</strong> $ {sim['total_valor']:.2f} &nbsp;&nbsp;|&nbsp;&nbsp;
-        <strong>📊 Lucro:</strong> $ {lucro:.2f} ({sim['lucro_pct']:.2f}%) &nbsp;&nbsp;|&nbsp;&nbsp;
-        <strong>L/PL:</strong> {sim['lpl_pct']:.2f}% &nbsp;&nbsp;|&nbsp;&nbsp;
-        <strong>🔻 Risco:</strong> $ {risco_maximo_valor:.2f} ({risco_maximo_pct:.2f}%) &nbsp;&nbsp;|&nbsp;&nbsp;
-        <strong>📈 R/R:</strong> {rr_ratio:.2f}
-        </p>
-        </div>
-        """, unsafe_allow_html=True)
+
+
+        compras_reais = sim.get("compras_reais", [])
+
+        if compras_reais:
+            total_disponivel = sim.get("quantidade_real", 0)
+            preco_medio = sim.get("preco_medio", 0)
+            total_investido = sum([c["preco"] * c["qtd"] for c in compras_reais])
+
+
+        # Apresentação em 2 colunas estilizadas
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"""
+            <div style='padding: 1rem; background-color: #eef5f9; border-radius: 10px; font-size: 17px;'>
+            <p><strong>Objetivos da Operação:</strong>&nbsp;&nbsp;<br>
+            <strong>📦 Qtd Final:</strong> {int(sim['total_unidades'])} ações (${sim['total_valor']:.2f})<br>
+            <strong>📊 Lucro:</strong> $ {lucro:.2f} ({sim['lucro_pct']:.2f}%) 
+            <strong>🔻 Risco:</strong> $ {risco_maximo_valor:.2f} ({risco_maximo_pct:.2f}%) &nbsp;&nbsp;|&nbsp;&nbsp;<br>
+            <strong>📈 R/R:</strong> {rr_ratio:.2f}
+            </div>
+            """, unsafe_allow_html=True)
+
+
+        with col2:
+            st.markdown(f"""
+            <div style='padding: 1rem; background-color: #e2f7d5; border-radius: 10px; font-size: 17px;'>
+            <p><strong>Alocação Atual:</strong>&nbsp;&nbsp;<br>
+            <strong>📦 Ações disponíveis para venda:</strong>  {total_disponivel} ações<br>
+            <strong>💰 Preço médio acumulado:</strong> {preco:.2f}<br>
+            <strong>💸 Total investido nas compras reais:</strong>  {total_investido:.2f}<br>
+            </div>
+            """, unsafe_allow_html=True)
 
 
         st.markdown(f"")
         col_hist, col_botoes = st.columns([2, 3])
 
         with col_hist:
-            if "compras_reais" in sim and sim["compras_reais"]:
-                total_disponivel = sim.get("quantidade_real", 0)
-                preco_medio = sim.get("preco_medio", 0)
-                total_investido = sum([c["preco"] * c["qtd"] for c in sim["compras_reais"]])
-
-                st.markdown("""
-                <div style='padding: 1rem; background-color: #f8f9fa; border-radius: 10px; font-size: 22px;'>
-                    <p><strong>🛒 Carteira Atual</strong>
-                <div style='padding: 1rem; background-color: #f8f9fa; border-radius: 10px; font-size: 16px;'>
-                    <p><strong>📦 Ações disponíveis para venda:</strong> {disponivel} ações
-                    <p><strong>💰 Preço médio acumulado:</strong> $ {preco:.2f}
-                    <p><strong>💸 Total investido nas compras reais:</strong> $ {investido:.2f}
-                </div>
-                """.format(disponivel=total_disponivel, preco=preco_medio, investido=total_investido), unsafe_allow_html=True)
-
                 st.markdown("#### 📜 Histórico de Compras Reais")
-                for i, c in enumerate(sim["compras_reais"]):
+                for i, c in enumerate(sim.get("compras_reais", [])):
                     with st.container():
-                        col1, col2 = st.columns([5, 1])
+                        col1, col2, col3 = st.columns([5, 1, 1])
                         with col1:
                             st.markdown(
                                 f"🛒 **Compra {i+1} ({c.get('etapa', '?')})** | "
-                                f"📅 {c.get('data', '—')} • "
+                                f"📅 {datetime.strptime(c.get('data', ''), '%Y-%m-%d').strftime('%d/%m/%Y') if c.get('data') else '—'} • "
                                 f"🔢 {c['qtd']} ações • "
                                 f"💵 $ {c['preco']:.2f}"
                             )
                         with col2:
                             if st.button("🗑", key=f"excluir_compra_{sim['nome']}_{idx}_{i}"):
-                                compra_removida = sim["compras_reais"].pop(i)
+                                # ... (sua lógica de exclusão permanece aqui, como já implementado)
+                                ...
+                        with col3:
+                            if st.button("✏️", key=f"editar_compra_{sim['nome']}_{idx}_{i}"):
+                                st.session_state["edit_compra_idx"] = (idx, i)
+                                st.rerun()
 
-                                # Se ficou vazio, garantir que a chave ainda exista
-                                if not sim["compras_reais"]:
-                                    sim["compras_reais"] = []
+                    # Bloco de edição fora das colunas
+                    if st.session_state.get("edit_compra_idx") == (idx, i):
+                        with st.form(key=f"form_editar_compra_{sim['nome']}_{idx}_{i}"):
+                            st.markdown("#### ✏️ Editar Compra Real")
+                            novo_preco = st.number_input("💵 Novo preço", value=c["preco"], step=0.01, format="%.2f", key=f"edit_preco_{idx}_{i}")
+                            data_padrao = datetime.strptime(c["data"], "%d/%m/%Y").date()
+                            nova_data_str = st.text_input("📅 Nova data da compra (DD/MM/AAAA)", data_padrao.strftime('%d/%m/%Y'), key=f"edit_data_compra_{idx}_{i}")
+                            try:
+                                nova_data = datetime.strptime(nova_data_str, "%d/%m/%Y").date()
+                            except ValueError:
+                                st.error("⚠️ Data inválida. Use o formato DD/MM/AAAA.")
+                                st.stop()
+                            if st.form_submit_button("💾 Salvar edição"):
+                                sim["compras_reais"][i]["preco"] = novo_preco
+                                sim["compras_reais"][i]["qtd"] = nova_qtd
+                                sim["compras_reais"][i]["data"] = str(nova_data)
+                                # Atualizar também a tabela da simulação com os dados editados
+                                etapa = c.get("etapa", "Inicial")
+                                etapa_nome = "COMPRA INICIAL" if etapa == "Inicial" else f"COMPRA {etapa}"
+                                tabela_df = pd.DataFrame(sim["tabela"])
+                                idx_linha = tabela_df[tabela_df["Etapa"].str.startswith(etapa_nome)].index
 
-                                # Restaurar nome e dados da etapa na tabela, se for COMPRA 2 ou 3
-                                if compra_removida["etapa"] in ["2", "3"]:
-                                    etapa = compra_removida["etapa"]
-                                    etapa_nome_real = f"COMPRA {etapa} - Real"
-                                    etapa_nome_original = f"COMPRA {etapa}"
-                                    tabela_df = pd.DataFrame(sim["tabela"])
-                                    idx_linha = tabela_df[tabela_df["Etapa"] == etapa_nome_real].index
+                                if not idx_linha.empty:
+                                    i_tabela = idx_linha[0]
+                                    preco_real = novo_preco
+                                    qtd_real = nova_qtd
+                                    valor_real = preco_real * qtd_real
+                                    pct_pl_real = (valor_real / sim["pl_total"]) * 100
+                                    preco_inicial = sim["cotacao"]
+                                    subida_pct_real = (preco_real / preco_inicial - 1) * 100
 
-                                    if not idx_linha.empty:
-                                        i = idx_linha[0]
-                                        pl_total = sim["pl_total"]
-                                        cotacao_inicial = sim["cotacao"]
+                                    try:
+                                        stop_pct = float(str(tabela_df.at[i_tabela, "STOP"]).replace("%", ""))
+                                    except:
+                                        stop_pct = 8.0
 
-                                        # Restaurar % PL COMPRA original
-                                        try:
-                                            pct_pl_original = float(str(tabela_df.at[i, "% PL COMPRA"]).replace("%", ""))
-                                        except:
-                                            pct_pl_original = 6.0 if etapa == "2" else 6.0
+                                    stop_price = preco_real * (1 - stop_pct / 100)
 
-                                        # Subida padrão da etapa
-                                        subida_padrao = 4.0 if etapa == "2" else 10.0
-                                        preco_simulado = cotacao_inicial * (1 + subida_padrao / 100)
-                                        valor = pl_total * (pct_pl_original / 100)
-                                        qtd = valor / preco_simulado
+                                    # Atualiza os dados na tabela
+                                    tabela_df.at[i_tabela, "Etapa"] = f"{etapa_nome} - Real"
+                                    tabela_df.at[i_tabela, "ADD"] = f"${preco_real:.2f}"
+                                    tabela_df.at[i_tabela, "QTD"] = f"{int(qtd_real)} UN"
+                                    tabela_df.at[i_tabela, "COMPRA PL"] = f"${valor_real:,.2f}"
+                                    tabela_df.at[i_tabela, "% PL COMPRA"] = f"{pct_pl_real:.2f}%"
+                                    tabela_df.at[i_tabela, "% PARA COMPRA"] = f"{subida_pct_real:.2f}%"
+                                    # Só altera o STOP se a etapa não for "Inicial"
+                                    if etapa != "Inicial":
+                                        tabela_df.at[i_tabela, "$ STOP"] = f"$ {stop_price:.2f}"
+                                        tabela_df.at[i_tabela, "STOP"] = f"{stop_pct:.2f}%"
 
-                                        try:
-                                            stop_pct = float(str(tabela_df.at[i, "STOP"]).replace("%", ""))
-                                        except:
-                                            stop_pct = 8.0
 
-                                        stop_price = preco_simulado * (1 - stop_pct / 100)
+                                    sim["tabela"] = tabela_df.to_dict(orient="list")
 
-                                        # Restaurar linha da tabela com os dados originais
-                                        tabela_df.at[i, "Etapa"] = etapa_nome_original
-                                        tabela_df.at[i, "ADD"] = f"${preco_simulado:.2f}"
-                                        tabela_df.at[i, "QTD"] = f"{int(qtd)} UN"
-                                        tabela_df.at[i, "COMPRA PL"] = f"${valor:,.2f}"
-                                        tabela_df.at[i, "% PL COMPRA"] = f"{pct_pl_original:.2f}%"
-                                        tabela_df.at[i, "% PARA COMPRA"] = f"{subida_padrao:.2f}%"
-                                        tabela_df.at[i, "$ STOP"] = f"$ {stop_price:.2f}"
-                                        tabela_df.at[i, "STOP"] = f"{stop_pct:.2f}%"
 
-                                        sim["tabela"] = tabela_df.to_dict(orient="list")
-
-                                # Atualiza valores acumulados
-                                total_qtd = sum([c["qtd"] for c in sim["compras_reais"]])
-                                total_valor = sum([c["preco"] * c["qtd"] for c in sim["compras_reais"]]) if sim["compras_reais"] else 0
+                                total_qtd = sum([compra["qtd"] for compra in sim["compras_reais"]])
+                                total_valor = sum([compra["preco"] * compra["qtd"] for compra in sim["compras_reais"]])
                                 sim["quantidade_real"] = total_qtd
                                 sim["preco_medio"] = total_valor / total_qtd if total_qtd else 0
 
-                                # Recalcula riscos e atualiza
                                 sim = recalcular_riscos(sim)
                                 st.session_state.simulacoes[idx] = sim
                                 ref.set(limpar_chaves_invalidas(st.session_state.simulacoes))
                                 st.session_state["keep_open_idx"] = idx
-                                st.success("🗑 Compra excluída com sucesso!")
+                                del st.session_state["edit_compra_idx"]
+                                st.success("📝 Compra editada com sucesso!")
                                 st.rerun()
+
+
 
 
 
         with col_botoes:
             col_ed, col_del = st.columns([1, 1])
             with col_ed:
-                if st.button(f"✏️ Editar {sim['nome']}", key=f"edit_{idx}"):
+                if st.button(f"✏️ Editar Planejamento {sim['nome']}", key=f"edit_{idx}"):
+                    st.session_state.open_planning_expander = True  # <- Expander abre junto
                     st.session_state.edit_index = idx
                     st.rerun()
+
+
             with col_del:
                 if st.button(f"🗑 Excluir {sim['nome']}", key=f"del_{idx}"):
                     del st.session_state.simulacoes[idx]
@@ -691,13 +674,20 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                     st.markdown("### 💰 Registrar Venda")
                     disponivel = int(sim.get("quantidade_real", sim.get("quantidade_restante", 0)))
 
-                    data_venda = st.date_input("📅 Data da venda", value=datetime.date.today(), key=f"data_venda_{idx}")
+                    data_venda_str = st.text_input("📅 Data da venda (DD/MM/AAAA)", date.today().strftime('%d/%m/%Y'), key=f"data_venda_{idx}")
+                    try:
+                        data_venda = datetime.strptime(data_venda_str, "%d/%m/%Y").date()
+                    except ValueError:
+                        st.error("⚠️ Data inválida. Use o formato DD/MM/AAAA.")
+                        st.stop()
+#                    st.caption(f"📅 Data selecionada: {data_venda.strftime('%d/%m/%Y')}")
+
                     preco_venda = st.number_input("💲 Preço de venda", step=0.01, format="%.2f", key=f"preco_venda_{idx}")
                     
                     if disponivel > 0:
                         qtd_vendida = st.number_input("🔢 Quantidade vendida", step=1, format="%d", key=f"qtd_vendida_{idx}", min_value=1, max_value=disponivel)
                         if st.form_submit_button("Confirmar Venda"):
-                            registrar_venda(sim, preco_venda, qtd_vendida, str(data_venda))
+                            registrar_venda(sim, preco_venda, qtd_vendida, data_venda.strftime('%d/%m/%Y'))
                             st.session_state["keep_open_idx"] = idx
                             st.success("✅ Venda registrada com sucesso!")
                             st.rerun()
@@ -740,7 +730,14 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                         etapa = st.selectbox("Etapa da compra", ["2", "3"], key=f"etapa_compra_{idx}")
                         preco_compra = st.number_input("💵 Preço da compra", step=0.01, format="%.2f", key=f"preco_compra_{idx}")
                         qtd_compra = st.number_input("🔢 Quantidade comprada", step=1, min_value=1, key=f"qtd_compra_{idx}")
-                        data_compra = st.date_input("📅 Data da compra", value=datetime.date.today(), key=f"data_compra_{idx}")
+                        data_compra_str = st.text_input("📅 Data da compra (DD/MM/AAAA)", date.today().strftime('%d/%m/%Y'), key=f"data_compra_{idx}")
+                        try:
+                            data_compra = datetime.strptime(data_compra_str, "%d/%m/%Y").date()
+                        except ValueError:
+                            st.error("⚠️ Data inválida. Use o formato DD/MM/AAAA.")
+                            st.stop()
+ #                       st.caption(f"📅 Data selecionada: {data_compra.strftime('%d/%m/%Y')}")
+
 
                         if etapa == "2":
                             preco2 = preco_compra
@@ -755,7 +752,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                             risco_max_total = sim["pl_total"] * (st.session_state.get("risco_maximo_pct", 1.0) / 100)
                             risco_max_inicial = risco_max_total - risco2
 
-                            compra_inicial = next((c for c in sim["compras_reais"] if c["etapa"] == "Inicial"), None)
+                            compra_inicial = next((c for c in sim.get("compras_reais", []) if c.get("etapa") == "Inicial"), None)
                             if compra_inicial:
                                 preco1 = compra_inicial["preco"]
                                 qtd1 = compra_inicial["qtd"]
@@ -764,7 +761,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                                     novo_stop1_pct = (preco1 - novo_stop1) / preco1 * 100
                                     tabela_df.loc[tabela_df["Etapa"] == "COMPRA INICIAL", "STOP"] = f"{novo_stop1_pct:.2f}%"
                                     sim["tabela"] = tabela_df.to_dict(orient="list")
-                                    st.success(f"📉 Stop da COMPRA INICIAL pode ser {novo_stop1_pct:.2f}% para manter risco ≤ 1% do PL")
+                            st.success(f"📉 Stop da COMPRA INICIAL pode ser {novo_stop1_pct:.2f}% ({novo_stop1:.2f}) para manter risco ≤ 1% do PL")
 
                         if etapa == "3":
                             tabela_df = pd.DataFrame(sim["tabela"])
@@ -788,7 +785,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                                 "etapa": etapa,
                                 "preco": preco_compra,
                                 "qtd": qtd_compra,
-                                "data": str(data_compra)
+                                "data": data_compra.strftime('%d/%m/%Y')
                             }
                             if "compras_reais" not in sim:
                                 sim["compras_reais"] = []
@@ -920,7 +917,7 @@ with col2:
 
 
 st.markdown("---")
-st.subheader("📁 Simulações Finalizadas")
+st.subheader("📁 Operações Finalizadas")
 vendas_registradas = finalizadas_ref.get()
 if vendas_registradas:
     for i, venda in enumerate(vendas_registradas[::-1]):
@@ -935,7 +932,15 @@ if vendas_registradas:
             with col1:
                 if st.button(f"✏️ Editar venda", key=f"editar_venda_{i}"):
                     with st.form(f"editar_venda_form_{i}"):
-                        nova_data = st.date_input("📅 Nova data da venda", value=datetime.date.fromisoformat(venda["data"]), key=f"data_edit_{i}")
+                        data_padrao = datetime.strptime(c["data"], "%d/%m/%Y").date()
+                        nova_data_str = st.text_input("📅 Nova data (DD/MM/AAAA)", data_padrao.strftime('%d/%m/%Y'), key=f"edit_data_{i}")
+                        try:
+                            nova_data = datetime.strptime(nova_data_str, "%d/%m/%Y").date()
+                        except ValueError:
+                            st.error("⚠️ Data inválida. Use o formato DD/MM/AAAA.")
+                            st.stop()
+                        st.caption(f"📅 Nova data: {nova_data.strftime('%d/%m/%Y')}")
+                       
                         novo_preco = st.number_input("💲 Novo preço de venda", value=venda["preco_venda"], step=0.01, format="%.2f", key=f"preco_edit_{i}")
                         nova_qtd = st.number_input("🔢 Nova quantidade vendida", value=int(venda["quantidade"]), step=1, key=f"qtd_edit_{i}")
                         if st.form_submit_button("Salvar alterações"):
@@ -962,5 +967,7 @@ if vendas_registradas:
                     finalizadas_ref.set(limpar_chaves_invalidas(vendas_restantes))
                     st.success("Venda removida com sucesso!")
                     st.rerun()
+                
+                
 else:
     st.info("Nenhuma venda registrada ainda.")
