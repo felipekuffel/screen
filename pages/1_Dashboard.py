@@ -26,6 +26,17 @@ import requests
 
 st.set_page_config(layout="wide")
 
+
+
+# At the VERY TOP of your script, after imports:
+if st.session_state.get("reset_loader_selectbox_on_next_run", False):
+    # Check if the key actually exists in session_state before trying to set it
+    # This can prevent errors if the app is run fresh and the selectbox hasn't been instantiated yet.
+    if "selectbox_carregar_filtro_estado" in st.session_state:
+        st.session_state.selectbox_carregar_filtro_estado = "Selecione..."
+    st.session_state.reset_loader_selectbox_on_next_run = False
+
+
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
@@ -47,12 +58,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-    <div style="text-align: right; margin-top: -20px; margin-bottom: 20px;">
-        <img src="https://i.ibb.co/1tCRXfWv/404aabba-df44-4fc5-9c02-04d5b56108b9.png" width="120">
-        <h5 style="margin-top: 8px;">Realize a busca no menu lateral</h5>
-    </div>
-""", unsafe_allow_html=True)
+
 
 
 
@@ -232,6 +238,7 @@ def plot_ativo(df, ticker, nome_empresa, vcp_detectado=False):
         print("Erro ao adicionar marcações de earnings:", e)
 
     return fig
+
 
 
 
@@ -454,65 +461,185 @@ def get_quarterly_growth_table_yfinance(ticker):
 
 
 
-
-
-
-
-# ---------------------- INTERFACE STREAMLIT ----------------------
-
-
-threshold = st.sidebar.slider("⚡ Limite de momentum", 0.01, 0.2, 0.07)
-dias_breakout = st.sidebar.slider("📈 Breakout da máxima dos últimos X dias", 5, 252, 20)
-lookback = st.sidebar.slider("📉 Candles recentes analisados para o filtro", 3, 10, 5)
-sinal = st.sidebar.selectbox("🎯 Filtrar por sinal", ["Nenhum", "Momentum + Breakout", "Momentum", "Breakout"])
-performance = st.sidebar.selectbox("📊 Filtro de desempenho", [
-    'Any', 'Today Up', 'Today Down', 'Today -15%', 'Today -10%', 'Today -5%', 'Today +5%', 'Today +10%', 'Today +15%',
-    'Week -30%', 'Week -20%', 'Week -10%', 'Week Down', 'Week Up', 'Week +10%', 'Week +20%', 'Week +30%',
-    'Month -50%', 'Month -30%', 'Month -20%', 'Month -10%', 'Month Down', 'Month Up', 'Month +10%', 'Month +20%', 'Month +30%', 'Month +50%',
-    'Quarter -50%', 'Quarter -30%', 'Quarter -20%', 'Quarter -10%', 'Quarter Down', 'Quarter Up', 'Quarter +10%', 'Quarter +20%', 'Quarter +30%', 'Quarter +50%',
-    'Half -75%', 'Half -50%', 'Half -30%', 'Half -20%', 'Half -10%', 'Half Down', 'Half Up', 'Half +10%', 'Half +20%', 'Half +30%', 'Half +50%', 'Half +100%',
-    'Year -75%', 'Year -50%', 'Year -30%', 'Year -20%', 'Year -10%', 'Year Down', 'Year Up', 'Year +10%', 'Year +20%', 'Year +30%', 'Year +50%', 'Year +100%', 'Year +200%', 'Year +300%', 'Year +500%',
-    'YTD -75%', 'YTD -50%', 'YTD -30%', 'YTD -20%', 'YTD -10%', 'YTD -5%', 'YTD Down', 'YTD Up', 'YTD +5%', 'YTD +10%', 'YTD +20%', 'YTD +30%', 'YTD +50%', 'YTD +100%'
-], index=0)  # <-- define "Any" como padrão
-change_filter = st.sidebar.selectbox("📉 Variação de Preço", ['Any', 'Up', 'Up 1%', 'Up 2%', 'Up 3%', 'Up 4%', 'Up 5%', 'Up 6%', 'Up 7%', 'Up 8%', 'Up 9%', 'Up 10%', 'Up 15%', 'Up 20%', 'Down', 'Down 1%', 'Down 2%', 'Down 3%', 'Down 4%', 'Down 5%', 'Down 6%', 'Down 7%', 'Down 8%', 'Down 9%', 'Down 10%', 'Down 15%', 'Down 20%'])
-highlow_filter = st.sidebar.selectbox("📊 52-Week High/Low", ['Any', 'New High', 'New Low', '5% or more below High', '10% or more below High', '15% or more below High', '20% or more below High', '30% or more below High', '40% or more below High', '50% or more below High', '60% or more below High', '70% or more below High', '80% or more below High', '90% or more below High', '0-3% below High', '0-5% below High', '0-10% below High', '5% or more above Low', '10% or more above Low', '15% or more above Low', '20% or more above Low', '30% or more above Low', '40% or more above Low', '50% or more above Low', '60% or more above Low', '70% or more above Low', '80% or more above Low', '90% or more above Low', '100% or more above Low', '120% or more above Low', '150% or more above Low', '200% or more above Low', '300% or more above Low', '500% or more above Low', '0-3% above Low', '0-5% above Low', '0-10% above Low'])
-volume_filter = st.sidebar.selectbox("🔊 Volume Médio", ["Over 300K", "Over 500K", "Over 1M", "Over 5M", "Over 10M"])
-sma20_filter = st.sidebar.selectbox("📏 SMA 20", ["Any", "Price above SMA20", "Price below SMA20"])
-sma50_filter = st.sidebar.selectbox("📏 SMA 50", ["Any", "Price above SMA50", "Price below SMA50"])
-sma200_filter = st.sidebar.selectbox("📏 SMA 200", ["Any", "Price above SMA200", "Price below SMA200"])
-mostrar_vcp = st.sidebar.checkbox("🔍 Mostrar apenas ativos com padrão VCP", value=False, key="checkbox_vcp")
-ordenamento_mm = st.sidebar.checkbox("📐 EMA20 > SMA50 > SMA150 > SMA200", value=False)
-sma200_crescente = st.sidebar.checkbox("📈 SMA200 maior que há 30 dias", value=False)
-executar = st.sidebar.button("🔎 Iniciar análise")
-
+#st.markdown("<h3 style='margin-top:-10px;'>📊 Screening Técnico</h3>", unsafe_allow_html=True)
 ticker_manual = st.sidebar.text_input("📌 Ver gráfico de um ticker específico (ex: AAPL)", key="textinput_ticker_manual").upper()
-
-st.sidebar.markdown("---")
-
-# Filtros base já incluídos
-filters_dict = {
-    "Performance": performance,
-    "Average Volume": volume_filter
-}
-
-if change_filter:
-    filters_dict["Change"] = change_filter
-if highlow_filter:
-    filters_dict["52-Week High/Low"] = highlow_filter
-if sma20_filter and sma20_filter != "Any":
-    filters_dict["20-Day Simple Moving Average"] = sma20_filter
-if sma50_filter and sma50_filter != "Any":
-    filters_dict["50-Day Simple Moving Average"] = sma50_filter
-if sma200_filter and sma200_filter != "Any":
-    filters_dict["200-Day Simple Moving Average"] = sma200_filter
-
-
-
-# ✅ Botão de logout sempre visível
 if st.sidebar.button("🚪 Sair"):
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.rerun()
+
+with st.expander("🔍 Realizar Busca", expanded=False):
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown("### 🎛️ Gerenciar Filtros")
+        nome_filtro = st.text_input("💾 Nome do filtro personalizado", key="filtro_nome_input") # Changed key to avoid conflict if "filtro_nome" is used elsewhere in session_state
+
+        # Initialize 'filtros_salvos' in session_state if it doesn't exist
+        if "filtros_salvos" not in st.session_state:
+            st.session_state.filtros_salvos = {}
+        
+        # Initialize 'selectbox_carregar_filtro_estado' if it's not already set (e.g., by the top-of-script reset)
+        if "selectbox_carregar_filtro_estado" not in st.session_state:
+            st.session_state.selectbox_carregar_filtro_estado = "Selecione..."
+
+        if st.button("📌 Salvar filtro atual"):
+            # Ensure nome_filtro is not empty
+            if st.session_state.filtro_nome_input:
+                st.session_state.filtros_salvos[st.session_state.filtro_nome_input] = {
+                    "performance": st.session_state.get("filtro_performance", "Any"),
+                    "volume": st.session_state.get("filtro_volume", "Over 300K"),
+                    "sinal": st.session_state.get("filtro_sinal", "Nenhum"),
+                    "highlow": st.session_state.get("filtro_highlow", "Any"),
+                    "sma20": st.session_state.get("filtro_sma20", "Any"),
+                    "sma50": st.session_state.get("filtro_sma50", "Any"),
+                    "sma200": st.session_state.get("filtro_sma200", "Any"),
+                    "ordenamento": st.session_state.get("ordenamento", False),
+                    "sma200_crescente": st.session_state.get("sma200_crescente", False),
+                    "mostrar_vcp": st.session_state.get("mostrar_vcp", False)
+                }
+                st.success(f"Filtro '{st.session_state.filtro_nome_input}' salvo com sucesso!")
+                # Saving a filter doesn't need to reset the loader selectbox or rerun immediately
+                # The list of saved filters will update when the selectbox is re-rendered
+                st.rerun() # Or st.rerun() if you want to ensure the list updates
+            else:
+                st.warning("Por favor, insira um nome para o filtro.")
+
+        # Load filter selectbox
+        # The list of options now directly uses st.session_state.filtros_salvos
+        opcao_selecionada_para_carregar = st.selectbox(
+            "📂 Carregar filtro salvo",
+            ["Selecione..."] + list(st.session_state.filtros_salvos.keys()),
+            key="selectbox_carregar_filtro_estado" # This key is reset at the top of the script
+        )
+
+        # Logic for when a filter is selected from the dropdown for LOADING
+        if opcao_selecionada_para_carregar != "Selecione...":
+            # This block now only runs if the user makes a new selection,
+            # because if it was processed, 'selectbox_carregar_filtro_estado'
+            # would have been reset to "Selecione..." by the logic at the top of the script.
+            filtro_data = st.session_state.filtros_salvos.get(opcao_selecionada_para_carregar)
+            
+            if filtro_data: # Check if filter_data was successfully retrieved
+                st.session_state.update({
+                    "filtro_performance": filtro_data["performance"],
+                    "filtro_volume": filtro_data["volume"],
+                    "filtro_sinal": filtro_data["sinal"],
+                    "filtro_highlow": filtro_data["highlow"],
+                    "filtro_sma20": filtro_data["sma20"],
+                    "filtro_sma50": filtro_data["sma50"],
+                    "filtro_sma200": filtro_data["sma200"],
+                    "ordenamento": filtro_data.get("ordenamento", False),
+                    "sma200_crescente": filtro_data.get("sma200_crescente", False),
+                    "mostrar_vcp": filtro_data.get("mostrar_vcp", False)
+                })
+                  # 🔒 Salva o filtro carregado para permitir exclusão posterior
+                st.session_state.filtro_a_excluir = opcao_selecionada_para_carregar
+                st.session_state.reset_loader_selectbox_on_next_run = True
+                st.rerun()
+
+        if st.button("🗑️ Excluir filtro selecionado"):
+            filtro_a_excluir = st.session_state.get("filtro_a_excluir", "Selecione...")
+            if filtro_a_excluir != "Selecione..." and filtro_a_excluir in st.session_state.filtros_salvos:
+                st.session_state.filtros_salvos.pop(filtro_a_excluir, None)
+                st.success(f"Filtro '{filtro_a_excluir}' excluído!")
+                st.session_state.filtro_a_excluir = "Selecione..."
+                st.session_state.reset_loader_selectbox_on_next_run = True
+                st.rerun()
+            else:
+                st.warning("Selecione um filtro da lista para excluir.")
+
+        if st.button("🧹 Limpar filtros"):
+            st.session_state.update({
+                "filtro_performance": "Any",
+                "filtro_volume": "Over 300K",
+                "filtro_sinal": "Nenhum",
+                "filtro_highlow": "Any",
+                "filtro_sma20": "Any",
+                "filtro_sma50": "Any",
+                "filtro_sma200": "Any",
+                "ordenamento": False,
+                "sma200_crescente": False,
+                "mostrar_vcp": False
+                # Also reset any other state variables related to filter inputs if necessary
+            })
+            st.success("Filtros de tela limpos. Selecione novos valores.")
+            # Signal that the "Carregar filtro salvo" selectbox should also reset to "Selecione..."
+            st.session_state.reset_loader_selectbox_on_next_run = True
+            st.rerun() # Rerun to reflect cleared filters and reset selectbox
+    
+
+    # Definitions for col2, col3, col4 widgets
+    with col2:
+        sinal = st.selectbox("🎯 Filtrar por sinal", ["Nenhum", "Momentum + Breakout", "Momentum", "Breakout"], key="filtro_sinal")
+        threshold = st.slider("⚡ Limite de momentum", 0.01, 0.2, 0.07, key="threshold_momentum") # Added key
+        dias_breakout = st.slider("📈 Breakout da máxima dos últimos X dias", 5, 252, 20, key="dias_breakout") # Added key
+        lookback = st.slider("📊 Candles recentes analisados", 3, 10, 5, key="lookback_candles") # Added key
+
+    with col3:
+        performance = st.selectbox("📈 Performance", [ 'Any', 'Today Up', 'Today Down', 'Today -15%', 'Today -10%', 'Today -5%', 'Today +5%', 'Today +10%', 'Today +15%',
+            'Week -30%', 'Week -20%', 'Week -10%', 'Week Down', 'Week Up', 'Week +10%', 'Week +20%', 'Week +30%',
+            'Month -50%', 'Month -30%', 'Month -20%', 'Month -10%', 'Month Down', 'Month Up', 'Month +10%', 'Month +20%', 'Month +30%', 'Month +50%',
+            'Quarter -50%', 'Quarter -30%', 'Quarter -20%', 'Quarter -10%', 'Quarter Down', 'Quarter Up', 'Quarter +10%', 'Quarter +20%', 'Quarter +30%', 'Quarter +50%',
+            'Half -75%', 'Half -50%', 'Half -30%', 'Half -20%', 'Half -10%', 'Half Down', 'Half Up', 'Half +10%', 'Half +20%', 'Half +30%', 'Half +50%', 'Half +100%',
+            'Year -75%', 'Year -50%', 'Year -30%', 'Year -20%', 'Year -10%', 'Year Down', 'Year Up', 'Year +10%', 'Year +20%', 'Year +30%', 'Year +50%', 'Year +100%', 'Year +200%', 'Year +300%', 'Year +500%',
+            'YTD -75%', 'YTD -50%', 'YTD -30%', 'YTD -20%', 'YTD -10%', 'YTD -5%', 'YTD Down', 'YTD Up', 'YTD +5%', 'YTD +10%', 'YTD +20%', 'YTD +30%', 'YTD +50%', 'YTD +100%'], key="filtro_performance")
+        change_filter = st.selectbox("📉 Variação Hoje", [ 'Any', 'Up', 'Up 1%', 'Up 2%', 'Up 3%', 'Up 4%', 'Up 5%', 'Up 6%', 'Up 7%', 'Up 8%', 'Up 9%', 'Up 10%', 'Up 15%', 'Up 20%',
+            'Down', 'Down 1%', 'Down 2%', 'Down 3%', 'Down 4%', 'Down 5%', 'Down 6%', 'Down 7%', 'Down 8%', 'Down 9%', 'Down 10%', 'Down 15%', 'Down 20%'], key="change_filter") # Added key
+        highlow_filter = st.selectbox("📊 52-Week High/Low", ['Any', 'New High', 'New Low', '5% or more below High', '10% or more below High', '15% or more below High',
+            '20% or more below High', '30% or more below High', '40% or more below High', '50% or more below High',
+            '60% or more below High', '70% or more below High', '80% or more below High', '90% or more below High',
+            '0-3% below High', '0-5% below High', '0-10% below High',
+            '5% or more above Low', '10% or more above Low', '15% or more above Low', '20% or more above Low',
+            '30% or more above Low', '40% or more above Low', '50% or more above Low', '60% or more above Low',
+            '70% or more above Low', '80% or more above Low', '90% or more above Low', '100% or more above Low',
+            '120% or more above Low', '150% or more above Low', '200% or more above Low', '300% or more above Low',
+            '500% or more above Low', '0-3% above Low', '0-5% above Low', '0-10% above Low'], key="filtro_highlow")
+        volume_filter = st.selectbox("🔊 Volume Médio", ["Over 300K", "Over 500K", "Over 1M", "Over 5M", "Over 10M"], key="filtro_volume")
+
+    with col4:
+        sma20_filter = st.selectbox("SMA 20", ['Any', 'Price below SMA20', 'Price 10% below SMA20', 'Price 20% below SMA20', 'Price 30% below SMA20', 'Price 40% below SMA20', 'Price 50% below SMA20', 'Price above SMA20', 'Price 10% above SMA20', 'Price 20% above SMA20', 'Price 30% above SMA20', 'Price 40% above SMA20', 'Price 50% above SMA20', 'Price crossed SMA20', 'Price crossed SMA20 above', 'Price crossed SMA20 below', 'SMA20 crossed SMA50', 'SMA20 crossed SMA50 above', 'SMA20 crossed SMA50 below', 'SMA20 crossed SMA200', 'SMA20 crossed SMA200 above', 'SMA20 crossed SMA200 below', 'SMA20 above SMA50', 'SMA20 below SMA50', 'SMA20 above SMA200', 'SMA20 below SMA200'], key="filtro_sma20")
+        sma50_filter = st.selectbox("SMA 50", ['Any', 'Price below SMA50', 'Price 10% below SMA50', 'Price 20% below SMA50', 'Price 30% below SMA50', 'Price 40% below SMA50', 'Price 50% below SMA50', 'Price above SMA50', 'Price 10% above SMA50', 'Price 20% above SMA50', 'Price 30% above SMA50', 'Price 40% above SMA50', 'Price 50% above SMA50', 'Price crossed SMA50', 'Price crossed SMA50 above', 'Price crossed SMA50 below', 'SMA50 crossed SMA20', 'SMA50 crossed SMA20 above', 'SMA50 crossed SMA20 below', 'SMA50 crossed SMA200', 'SMA50 crossed SMA200 above', 'SMA50 crossed SMA200 below', 'SMA50 above SMA20', 'SMA50 below SMA20', 'SMA50 above SMA200', 'SMA50 below SMA200'], key="filtro_sma50")
+        sma200_filter = st.selectbox("SMA 200", ['Any', 'Price below SMA200', 'Price 10% below SMA200', 'Price 20% below SMA200', 'Price 30% below SMA200', 'Price 40% below SMA200', 'Price 50% below SMA200', 'Price 60% below SMA200', 'Price 70% below SMA200', 'Price 80% below SMA200', 'Price 90% below SMA200', 'Price above SMA200', 'Price 10% above SMA200', 'Price 20% above SMA200', 'Price 30% above SMA200', 'Price 40% above SMA200', 'Price 50% above SMA200', 'Price 60% above SMA200', 'Price 70% above SMA200', 'Price 80% above SMA200', 'Price 90% above SMA200', 'Price 100% above SMA200', 'Price crossed SMA200', 'Price crossed SMA200 above', 'Price crossed SMA200 below', 'SMA200 crossed SMA20', 'SMA200 crossed SMA20 above', 'SMA200 crossed SMA20 below', 'SMA200 crossed SMA50', 'SMA200 crossed SMA50 above', 'SMA200 crossed SMA50 below', 'SMA200 above SMA20', 'SMA200 below SMA20', 'SMA200 above SMA50', 'SMA200 below SMA50'], key="filtro_sma200")
+        ordenamento_mm = st.checkbox("🖐 EMA20 > SMA50 > SMA150 > SMA200", value=st.session_state.get("ordenamento", False), key="ordenamento")
+        sma200_crescente = st.checkbox("📈 SMA200 maior que há 30 dias", value=st.session_state.get("sma200_crescente", False), key="sma200_crescente")
+        mostrar_vcp = st.checkbox("🔍 Mostrar apenas ativos com padrão VCP", value=st.session_state.get("mostrar_vcp", False), key="mostrar_vcp")
+
+    executar = st.button("🔎 Iniciar análise")
+
+# REMOVED: The generic rerun_filtros logic. Reruns are handled by actions directly.
+# if st.session_state.get("rerun_filtros", False):
+# st.session_state["rerun_filtros"] = False
+# st.rerun()
+
+# Construct filters_dict using values from st.session_state or widget variables directly
+# It's good practice to ensure keys exist in st.session_state before get, or provide defaults
+filters_dict = {
+    "Performance": st.session_state.get("filtro_performance", "Any"), # Use .get for safety
+    "Average Volume": st.session_state.get("filtro_volume", "Over 300K")
+}
+# Use st.session_state.get for all these, referencing the keys you used in the widgets
+current_change_filter = st.session_state.get("change_filter", "Any")
+if current_change_filter and current_change_filter != "Any": # Finviz might not like "Any" for "Change"
+    filters_dict["Change"] = current_change_filter
+
+current_highlow_filter = st.session_state.get("filtro_highlow", "Any")
+if current_highlow_filter and current_highlow_filter != "Any":
+    filters_dict["52-Week High/Low"] = current_highlow_filter
+
+current_sma20_filter = st.session_state.get("filtro_sma20", "Any")
+if current_sma20_filter and current_sma20_filter != "Any":
+    filters_dict["20-Day Simple Moving Average"] = current_sma20_filter
+
+current_sma50_filter = st.session_state.get("filtro_sma50", "Any")
+if current_sma50_filter and current_sma50_filter != "Any":
+    filters_dict["50-Day Simple Moving Average"] = current_sma50_filter
+
+current_sma200_filter = st.session_state.get("filtro_sma200", "Any")
+if current_sma200_filter and current_sma200_filter != "Any":
+    filters_dict["200-Day Simple Moving Average"] = current_sma200_filter
+
+
 
 
 def inserir_preco_no_meio(niveis: list, preco: float) -> pd.DataFrame:
