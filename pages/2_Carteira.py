@@ -706,7 +706,11 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                             try:
                                 preco = float(str(row["ADD"]).replace("$", "").replace(",", ""))
                                 qtd = float(str(row["QTD"]).replace(" UN", "").replace(",", ""))
-                                stop_pct = float(str(row["STOP"]).replace("%", ""))
+                                try:
+                                    stop_str = str(row["STOP"]).replace("%", "").strip()
+                                    stop_pct = float(stop_str) if stop_str not in ["", "None", "nan"] else 0.0
+                                except:
+                                    stop_pct = 0.0
                             except:
                                 continue
 
@@ -911,6 +915,69 @@ with col2:
 
     </div>
     """, unsafe_allow_html=True)
+
+
+
+
+
+
+
+
+# Inicializa valores acumulados
+valor_investido_total = 0
+valor_mercado_total = 0
+
+for sim in st.session_state.simulacoes:
+    qtd_real = sim.get("quantidade_real", 0)
+    preco_medio = sim.get("preco_medio", 0)
+    valor_investido = preco_medio * qtd_real
+    valor_atual = get_preco_atual(sim["nome"]) or preco_medio
+    valor_mercado = valor_atual * qtd_real
+
+    valor_investido_total += valor_investido
+    valor_mercado_total += valor_mercado
+
+# Lucro/prejuízo real até o momento
+lucro_real = valor_mercado_total - valor_investido_total
+
+# Recalcula faixa com base no risco planejado e lucro estimado
+lucro_estimado_total = sum([sim.get("lucro", 0) for sim in st.session_state.simulacoes])
+risco_total = total_risco_compras_reais
+
+faixa_total = risco_total + lucro_estimado_total
+if faixa_total == 0:
+    faixa_total = 1
+
+# Calcula posição relativa atual entre -risco e +lucro
+progresso_pct = faixa_total / lucro_real
+posicao_pct = max(2, min(98, progresso_pct))
+
+# Determina cor e sinal
+cor_valor = "#28a745" if lucro_real >= 0 else "#dc3545"
+sinal = "+" if lucro_real >= 0 else "-"
+
+# Mostra barra com valor atual e posição visual
+st.markdown("---")
+st.markdown("### ⚖️ Lucro Real x Risco Planejado")
+
+st.markdown(f"""
+<div style='text-align:center; font-size:18px; margin-bottom:5px; color:{cor_valor};'>
+    {sinal}${abs(lucro_real):,.2f} ({progresso_pct:.1f}% do objetivo)
+</div>
+
+<div style='position: relative; width: 100%; height: 30px; background: linear-gradient(to right, #dc3545, #6c757d, #28a745); 
+            border-radius: 10px; margin-bottom: 5px;'>
+    <div style='position: absolute; left: {posicao_pct}%; top: -14px; transform: translateX(-50%); font-size: 22px;'>▲</div>
+    <div style='position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background-color: #ffffff77;'></div>
+</div>
+<div style='display: flex; justify-content: space-between; font-size: 16px;'>
+    <span style='color: #dc3545;'>📉 -${risco_total:,.0f}</span>
+    <span style='color: #28a745;'>+${lucro_estimado_total:,.0f} 💰</span>
+</div>
+""", unsafe_allow_html=True)
+
+
+
 
 
 
