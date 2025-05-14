@@ -192,7 +192,7 @@ with st.expander("Expandir/Minimizar Planejamento", expanded=expanded_planning):
     with col4:
         pl_total = st.number_input("💼 Capital Total (PL)", value=pl_total_default, step=100.0, key="pl_total_live")
     with col5:
-        data_simulacao_str = st.text_input("📅 Data da Simulação (DD/MM/AAAA)", date.today().strftime('%d/%m/%Y'), key="data_simulacao_live")
+        data_simulacao_str = st.text_input("📅 Data (DD/MM/AAAA)", date.today().strftime('%d/%m/%Y'), key="data_simulacao_live")
 
         try:
             data_simulacao = datetime.strptime(data_simulacao_str, "%d/%m/%Y").date()
@@ -585,6 +585,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
                         with st.form(key=f"form_editar_compra_{sim['nome']}_{idx}_{i}"):
                             st.markdown("#### ✏️ Editar Compra Real")
                             novo_preco = st.number_input("💵 Novo preço", value=c["preco"], step=0.01, format="%.2f", key=f"edit_preco_{idx}_{i}")
+                            nova_qtd = st.number_input("📦 Nova quantidade", value=c["qtd"], step=1, min_value=1, key=f"edit_qtd_{idx}_{i}")
                             data_padrao = datetime.strptime(c["data"], "%d/%m/%Y").date()
                             nova_data_str = st.text_input("📅 Nova data da compra (DD/MM/AAAA)", data_padrao.strftime('%d/%m/%Y'), key=f"edit_data_compra_{idx}_{i}")
                             try:
