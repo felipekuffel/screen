@@ -6,7 +6,7 @@ import re
 from datetime import datetime, date
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
-from screener.layout import aplicar_zoom
+from layout import aplicar_zoom
 
 aplicar_zoom(70)  # ou 80, 90, etc.
 
