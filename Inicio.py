@@ -188,7 +188,6 @@ def page_login_registration():
                         st.error("As senhas não coincidem.")
                 else:
                     st.warning("Por favor, preencha todos os campos.")
-    st.markdown("---")
 
 def restore_session():
     if "refresh_token" in st.session_state and "logged_in" not in st.session_state:
