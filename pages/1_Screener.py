@@ -25,8 +25,26 @@ from finvizfinance.screener.overview import Overview
 import requests
 import hashlib
 import json
-from Screener.layout import aplicar_zoom
 
+
+
+st.markdown("""
+    <style>
+    html, body {
+        overflow: hidden;
+    }
+    [data-testid="stApp"] {
+        transform: scale(0.8);
+        transform-origin: top left;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 145%;
+        height: 145%;
+        overflow: scroll;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
@@ -53,7 +71,6 @@ if st.session_state.get("reset_loader_selectbox_on_next_run", False):
         st.session_state.selectbox_carregar_filtro_estado = "Selecione..."
     st.session_state.reset_loader_selectbox_on_next_run = False
 
-aplicar_zoom(85) 
 st.markdown("""
     <style>
     [data-testid="stSidebar"]::before {
