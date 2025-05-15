@@ -1145,7 +1145,7 @@ st.markdown(f"""
 st.markdown(f"""
 <!-- Legenda acima -->
 <div style='position: relative; width: 100%; height: 25px; font-weight: bold; margin-bottom: 4px; font-size: 14px;'>
-  <div style='position: absolute; left: {executado_pct:.2f}%; transform: translateX(-50%); color: {cor_exec};'>📍 Compras atuais</div>
+  <div style='position: absolute; left: {executado_pct:.2f}%; transform: translateX(-50%); color: {cor_exec};'>📍 Atual</div>
   <div style='position: absolute; left: {planejado_pct:.2f}%; transform: translateX(-50%); color: {cor_plan};'>🔮 Após todas as compras</div>
 </div>
 
