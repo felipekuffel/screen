@@ -243,24 +243,6 @@ if not restore_session():  # Se não estiver logado
     page_login_registration()
     st.stop()
 
-st.markdown("""
-    <style>
-    html, body {
-        overflow: hidden;
-    }
-    [data-testid="stApp"] {
-        transform: scale(0.7);
-        transform-origin: top left;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 145%;
-        height: 145%;
-        overflow: scroll;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # --- Se chegou aqui, o usuário está logado ---
 st.sidebar.success(f"Login como: {st.session_state.get('email', 'N/A')}")
 st.sidebar.markdown("---")
