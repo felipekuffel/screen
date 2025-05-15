@@ -119,7 +119,7 @@ def registrar_venda(sim, preco_venda, qtd_vendida, data_venda):
 
     venda = {
         "nome": sim["nome"],
-        "data": datetime.strptime(str(data_venda), "%Y-%m-%d").strftime('%d/%m/%Y'),
+        "data": datetime.strptime(data_venda, "%d/%m/%Y").strftime('%d/%m/%Y') if isinstance(data_venda, str) else data_venda.strftime('%d/%m/%Y'),
         "preco_venda": preco_venda,
         "quantidade": qtd_vendida,
         "lucro": lucro,
@@ -1133,7 +1133,6 @@ st.markdown(f"""
 
 
 
-import streamlit as st
 
 # DASHBOARD DE RANKING (Adicione este bloco ao final do seu arquivo)
 st.markdown("---")
@@ -1174,69 +1173,182 @@ for i, ativo in enumerate(ativos_ordenados):
     """
     st.markdown(html, unsafe_allow_html=True)
 
+# 📊 Painel de Resumo das Vendas Finalizadas
+st.markdown("---")
+st.markdown("### 🧾 Análise Visual das Últimas 10 Vendas")
+
+vendas = finalizadas_ref.get() or []
+ultimas_vendas = vendas[-10:] if vendas else []
+
+if ultimas_vendas:
+    max_abs_lucro = max(abs(v["lucro"]) for v in ultimas_vendas) or 1
+
+    col_esq, col_dir = st.columns(2)
+
+    for i, venda in enumerate(reversed(ultimas_vendas)):
+        nome = venda["nome"]
+        data = venda["data"]
+        lucro = venda["lucro"]
+        cor_barra = "#28a745" if lucro > 0 else "#dc3545"
+        emoji = "🟢" if lucro > 0 else "🔴"
+        texto = f"${lucro:,.2f}"
+
+        largura = abs(lucro) / max_abs_lucro * 50
+        direcao = "50%" if lucro >= 0 else f"calc(50% - {largura}%)"
+
+        html = f"""
+        <div style='margin-bottom: 24px; padding: 10px; border-radius: 8px; background-color: #f8f9fa;'>
+            <div style='font-size: 15px; margin-bottom: 6px;'>
+                <strong>{emoji} {i+1}. {nome}</strong> | {data} | Lucro: {texto}
+            </div>
+            <div style='position: relative; height: 16px; background-color: #e9ecef; border-radius: 8px;'>
+                <div style='position: absolute; left: {direcao}; top: 0; bottom: 0; width: {largura}%;
+                            background-color: {cor_barra}; border-radius: 8px;'></div>
+                <div style='position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px;
+                            background-color: #00000044;'></div>
+            </div>
+        </div>
+        """
+
+        if i < 5:
+            col_esq.markdown(html, unsafe_allow_html=True)
+        else:
+            col_dir.markdown(html, unsafe_allow_html=True)
+
+else:
+    st.info("Ainda não há vendas registradas para exibir.")
 
 
 
 
+    # 🔍 RESUMO FINAL DAS 10 VENDAS
+lucros_positivos = [v for v in ultimas_vendas if v["lucro"] > 0]
+lucros_negativos = [v for v in ultimas_vendas if v["lucro"] < 0]
+
+qtd_lucros = len(lucros_positivos)
+qtd_prejuizos = len(lucros_negativos)
+soma_lucros = sum(v["lucro"] for v in lucros_positivos)
+soma_prejuizos = sum(v["lucro"] for v in lucros_negativos)
+lucro_liquido = soma_lucros + soma_prejuizos
+
+cor_liquido = "#28a745" if lucro_liquido >= 0 else "#dc3545"
+sinal_liquido = "🟢" if lucro_liquido >= 0 else "🔴"
+
+st.markdown(f"""
+<div style='background-color:#f8f9fa; padding: 15px; border-radius: 8px; font-size: 16px;'>
+<ul>
+    <li>🟢 <strong>{qtd_lucros} com lucro</strong> • Total: <span style="color:#28a745;">${soma_lucros:,.2f}</span></li>
+    <li>🔴 <strong>{qtd_prejuizos} com prejuízo</strong> • Total: <span style="color:#dc3545;">${abs(soma_prejuizos):,.2f}</span></li>
+    <li><strong>{sinal_liquido} Lucro líquido das 10 vendas:</strong> <span style="color:{cor_liquido};">${lucro_liquido:,.2f}</span></li>
+</ul>
+</div>
+""", unsafe_allow_html=True)
 
 
 
-
-
-
+import io
+import base64
 
 st.markdown("---")
-st.subheader("📁 Operações Finalizadas")
-vendas_registradas = finalizadas_ref.get()
-if vendas_registradas:
-    for i, venda in enumerate(vendas_registradas[::-1]):
-        with st.expander(f"{venda['tipo']} {venda['nome']} • {venda['data']} • {venda['quantidade']} ações vendidas a $ {venda['preco_venda']:.2f}"):
-            st.markdown(f"""
-            - 💰 **Lucro:** $ {venda['lucro']:.2f} ({venda['lucro_pct']:.2f}%)
-            - 📆 **Data:** {venda['data']}
-            - 📉 **Preço de venda:** $ {venda['preco_venda']:.2f}
-            - 🔢 **Quantidade vendida:** {venda['quantidade']} ações
-            """)
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                if st.button(f"✏️ Editar venda", key=f"editar_venda_{i}"):
-                    with st.form(f"editar_venda_form_{i}"):
-                        data_padrao = datetime.strptime(c["data"], "%d/%m/%Y").date()
-                        nova_data_str = st.text_input("📅 Nova data (DD/MM/AAAA)", data_padrao.strftime('%d/%m/%Y'), key=f"edit_data_{i}")
-                        try:
-                            nova_data = datetime.strptime(nova_data_str, "%d/%m/%Y").date()
-                        except ValueError:
-                            st.error("⚠️ Data inválida. Use o formato DD/MM/AAAA.")
-                            st.stop()
-                        st.caption(f"📅 Nova data: {nova_data.strftime('%d/%m/%Y')}")
-                       
-                        novo_preco = st.number_input("💲 Novo preço de venda", value=venda["preco_venda"], step=0.01, format="%.2f", key=f"preco_edit_{i}")
-                        nova_qtd = st.number_input("🔢 Nova quantidade vendida", value=int(venda["quantidade"]), step=1, key=f"qtd_edit_{i}")
-                        if st.form_submit_button("Salvar alterações"):
-                            valor_total_venda = novo_preco * nova_qtd
-                            valor_total_custo = (venda["lucro"] + venda["preco_venda"] * venda["quantidade"] - valor_total_venda)
-                            lucro = valor_total_venda - valor_total_custo
-                            lucro_pct = lucro / valor_total_custo * 100 if valor_total_custo != 0 else 0
-                            venda_editada = {
-                                **venda,
-                                "data": str(nova_data),
-                                "preco_venda": novo_preco,
-                                "quantidade": nova_qtd,
-                                "lucro": lucro,
-                                "lucro_pct": lucro_pct
-                            }
-                            vendas_registradas[i] = venda_editada
-                            finalizadas_ref.set(limpar_chaves_invalidas(vendas_registradas))
-                            st.success("Venda editada com sucesso!")
-                            st.rerun()
-            with col2:
-                if st.button(f"🗑 Excluir venda", key=f"excluir_venda_{i}"):
-                    vendas_restantes = vendas_registradas.copy()
-                    vendas_restantes.pop(len(vendas_registradas) - 1 - i)
-                    finalizadas_ref.set(limpar_chaves_invalidas(vendas_restantes))
-                    st.success("Venda removida com sucesso!")
-                    st.rerun()
-                
-                
+st.markdown("### 🧾 Operações Finalizadas (Tabela Compacta)")
+
+vendas = finalizadas_ref.get() or []
+
+if vendas:
+    total_pos = sum(1 for v in vendas if v.get("lucro", 0) > 0)
+    total_neg = sum(1 for v in vendas if v.get("lucro", 0) < 0)
+    total = len(vendas)
+    pct_pos = (total_pos / total) * 100 if total else 0
+    pct_neg = (total_neg / total) * 100 if total else 0
+
+    st.markdown(f"""
+    <div style='background-color:#f0f0f0; padding: 15px; border-radius: 10px; font-size: 16px;'>
+    <ul>
+        <li>✅ <strong>Total de Vendas com Lucro:</strong> {total_pos} ({pct_pos:.1f}%)</li>
+        <li>❌ <strong>Total com Prejuízo:</strong> {total_neg} ({pct_neg:.1f}%)</li>
+        <li>📦 <strong>Total de Vendas Registradas:</strong> {total}</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Pega as simulações completas salvas no Firebase (ativas ou não)
+    sim_ativas = ref.get() or []
+    sim_por_nome = {sim["nome"]: sim for sim in sim_ativas}
+
+    dados_tabela = []
+    for venda in reversed(vendas):  # Mais recentes primeiro
+        nome = venda["nome"]
+        sim = sim_por_nome.get(nome)
+
+        # Tenta extrair a compra inicial
+        data_compra = "—"
+        preco_compra = None
+
+        if sim and "compras_reais" in sim:
+            compras = sim["compras_reais"]
+            if len(compras) > 0:
+                primeira = compras[0]
+                data_compra = primeira.get("data", "—")
+                preco_compra = primeira.get("preco")
+
+        dados_tabela.append({
+            "Ativo": nome,
+            "Data Venda": venda["data"],
+            "Preço Venda": f"${venda['preco_venda']:.2f}",
+            "Qtd": venda["quantidade"],
+            "Lucro ($)": f"${venda['lucro']:.2f}",
+            "Lucro (%)": f"{venda['lucro_pct']:.1f}%",
+            "Tipo": venda["tipo"],
+            "Data Compra": data_compra,
+            "Preço Compra": f"${preco_compra:.2f}" if preco_compra else "—",
+        })
+
+    df = pd.DataFrame(dados_tabela)
+
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # Botão de download CSV
+    csv = df.to_csv(index=False).encode('utf-8')
+    b64 = base64.b64encode(csv).decode()
+    href = f'<a href="data:file/csv;base64,{b64}" download="vendas_finalizadas.csv">📥 Baixar CSV</a>'
+    st.markdown(href, unsafe_allow_html=True)
+    # 🔻 Excluir múltiplas vendas
+   # 🔻 Excluir múltiplas vendas
+    st.markdown("#### 🗑 Excluir vendas selecionadas")
+
+    # Cria lista de exibição com índice reverso para manter ordem (mais recente primeiro)
+    opcoes_exclusao = [
+        f"{v['data']} | {v['nome']} | {v['quantidade']} ações a ${v['preco_venda']:.2f}"
+        for v in reversed(vendas)
+    ]
+    selecionadas = st.multiselect("Selecione uma ou mais vendas para excluir:", opcoes_exclusao)
+
+    botao_excluir = st.button("🗑 Excluir selecionadas")
+
+    if botao_excluir:
+        if not st.session_state.selecionadas_exclusao:
+            st.warning("⚠️ Selecione ao menos uma venda para excluir.")
+        else:
+            vendas_restantes = vendas.copy()
+
+            indices_para_remover = [
+                len(vendas) - 1 - st.session_state.selecionadas_exclusao.index(s)
+                for s in st.session_state.selecionadas_exclusao
+            ]
+            indices_para_remover.sort(reverse=True)
+
+            for idx in indices_para_remover:
+                if 0 <= idx < len(vendas_restantes):
+                    vendas_restantes.pop(idx)
+
+            finalizadas_ref.set(limpar_chaves_invalidas(vendas_restantes))
+            st.success(f"✅ {len(st.session_state.selecionadas_exclusao)} venda(s) excluída(s) com sucesso.")
+            st.session_state.selecionadas_exclusao = []  # limpa após exclusão
+            st.rerun()
+
+
+
+
+
 else:
-    st.info("Nenhuma venda registrada ainda.")
+    st.info("Nenhuma venda registrada ainda para análise.")
