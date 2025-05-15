@@ -4,7 +4,7 @@ import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
 from cryptography.hazmat.primitives import serialization
-from screener.layout import aplicar_zoom
+from layout import aplicar_zoom
 
 aplicar_zoom(70) 
 # --- Configuração da Página ---
