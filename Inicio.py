@@ -4,7 +4,6 @@ import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
 from cryptography.hazmat.primitives import serialization
-from Screener.layout import aplicar_zoom
 
 # ✅ Verifica login antes de qualquer coisa
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
@@ -261,8 +260,6 @@ st.markdown("Utilize a navegação na barra lateral para acessar as funcionalida
 st.markdown("---")
 #st.image("https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", caption="Análise de Dados Financeiros")
 
-if "logged_in" in st.session_state and st.session_state.logged_in:
-    aplicar_zoom(70)
 
 # Botão de Logout na Sidebar (aparece em todas as páginas)
 if st.sidebar.button("🚪 Sair", use_container_width=True):
