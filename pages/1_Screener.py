@@ -53,7 +53,7 @@ if st.session_state.get("reset_loader_selectbox_on_next_run", False):
         st.session_state.selectbox_carregar_filtro_estado = "Selecione..."
     st.session_state.reset_loader_selectbox_on_next_run = False
 
-aplicar_zoom(70) 
+aplicar_zoom(80) 
 st.markdown("""
     <style>
     [data-testid="stSidebar"]::before {
