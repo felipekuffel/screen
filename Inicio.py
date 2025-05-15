@@ -4,9 +4,9 @@ import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
 from cryptography.hazmat.primitives import serialization
-from layout import aplicar_zoom
+from Screener.layout import aplicar_zoom
 
-aplicar_zoom(70) 
+aplicar_zoom(70)  # ou 80, 90, etc.
 # --- Configuração da Página ---
 st.set_page_config(
     page_title="Painel de Análise",
