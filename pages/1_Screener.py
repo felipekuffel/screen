@@ -1044,7 +1044,8 @@ if executar:
 if executar:
     try:
         # ✅ SANITIZAÇÃO RADICAL DOS TICKERS
-        tickers_limpos = [t.strip().upper() for t in tickers if isinstance(t, str) and t.strip()]
+        tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
+
         if not tickers_limpos:
             st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
             st.stop()
@@ -1080,22 +1081,20 @@ with st.expander("🕓 Histórico de Buscas"):
     historico = historico_ref.get()
 
     if historico:
-        # Monta nomes legíveis com data e filtros
         opcoes_dict = {}
         for chave, dados in historico.items():
-            # Extrai data do timestamp da chave (assumindo formato 20250514-1708_xxxx)
             try:
                 data_part = chave.split("_")[0]
                 data_formatada = f"{data_part[6:8]}/{data_part[4:6]}/{data_part[0:4]}"
             except:
                 data_formatada = "Data inválida"
 
-            # Usa nome legível salvo ou a chave
             nome_exibicao = dados.get("nome_exibicao", chave)
-            nome_legivel = f"{data_formatada} - {nome_exibicao}"
+            qtde = len(dados.get("tickers", []))
+            nome_legivel = f"{data_formatada} - {nome_exibicao} ({qtde} ativo{'s' if qtde != 1 else ''})"
             opcoes_dict[nome_legivel] = chave
 
-        opcoes_legiveis = list(opcoes_dict.keys())[::-1]  # mais recentes primeiro
+        opcoes_legiveis = list(opcoes_dict.keys())[::-1]
         busca_legivel_selecionada = st.selectbox("📅 Selecionar busca anterior:", opcoes_legiveis)
         busca_selecionada = opcoes_dict[busca_legivel_selecionada]
 
@@ -1116,8 +1115,6 @@ with st.expander("🕓 Histórico de Buscas"):
                 except Exception as e:
                     st.error(f"Erro ao excluir histórico: {e}")
 
-
-   
 
 __all__ = [
     "calcular_indicadores",
