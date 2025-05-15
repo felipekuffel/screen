@@ -6,15 +6,36 @@ import re
 from datetime import datetime, date
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
-from Screener.layout import aplicar_zoom
 
-#aplicar_zoom(75)  # ou 80, 90, etc.
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
+
+escala = percentual / 100
+proporcao = 100 / escala  # ex: 100 / 0.7 = 143%
+
+st.markdown(f"""
+    <style>
+    html, body {{
+        overflow: hidden;
+    }}
+    [data-testid="stApp"] {{
+        transform: scale({escala});
+        transform-origin: top left;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: {proporcao:.0f}%;
+        height: {proporcao:.0f}%;
+        overflow: scroll;
+    }}
+    </style>
+""", unsafe_allow_html=True)
+
+
     
 
 
