@@ -511,22 +511,15 @@ for idx, sim in enumerate(st.session_state.simulacoes):
         compra_2_pct = None
         preco_2 = None
     
-    try:
-        compra_3_pct = float(sim["tabela"]["% PARA COMPRA"][2].replace('%', ''))
-        preco_3 = sim["cotacao"] * (1 + compra_3_pct / 100)
-    except:
-        compra_3_pct = None
-        preco_3 = None
-    
-    # Avaliação de faixas
+    # Já temos preco_2 e preco_3 aqui
     try:
         tabela_df = pd.DataFrame(sim["tabela"])
-        
+    
         preco_2 = sim["cotacao"] * (float(tabela_df[tabela_df["Etapa"].str.startswith("COMPRA 2")]["% PARA COMPRA"].iloc[0].replace('%','')) / 100 + 1)
         
         linha_compra3 = tabela_df[tabela_df["Etapa"].str.startswith("COMPRA 3")].iloc[0]
         preco_3 = float(str(linha_compra3["ADD"]).replace("$", "").replace(",", ""))
-        
+    
         if valor_atual < preco_2:
             alerta = "🟢 Em faixa da COMPRA INICIAL"
             falta_pct = (preco_2 - valor_atual) / valor_atual * 100
@@ -541,7 +534,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
     
         else:
             acima_pct = ((valor_atual - preco_3) / preco_3) * 100
-            alerta = f"🔴 Preço acima da COMPRA 3 em {abima_pct:.2f}% (R$ {preco_3:.2f})"
+            alerta = f"🔴 Acima da COMPRA 3 em +{acima_pct:.2f}% (R$ {preco_3:.2f})"
             aviso_proxima = ""
             sinal_proxima = "🔴"
     
@@ -549,7 +542,6 @@ for idx, sim in enumerate(st.session_state.simulacoes):
         alerta = "⚠️ Erro ao calcular faixa de preço"
         aviso_proxima = ""
         sinal_proxima = "⚠️"
-
 
     destaque_cor = "#e6fff2"
     if valor_atual >= preco_final:
