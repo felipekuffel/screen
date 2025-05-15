@@ -14,26 +14,7 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
 
-st.markdown("""
-    <style>
-    html, body {
-        overflow: hidden;
-    }
-    [data-testid="stApp"] {
-        transform: scale(0.7);
-        transform-origin: top left;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 145%;
-        height: 145%;
-        overflow: scroll;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-
-    
 
 
 try:
@@ -1164,7 +1145,7 @@ st.markdown(f"""
 <!-- Legenda acima -->
 <div style='position: relative; width: 100%; height: 25px; font-weight: bold; margin-bottom: 4px; font-size: 14px;'>
   <div style='position: absolute; left: {executado_pct:.2f}%; transform: translateX(-50%); color: {cor_exec};'>📍 Atual</div>
-  <div style='position: absolute; left: {planejado_pct:.2f}%; transform: translateX(-50%); color: {cor_plan};'>🔮 Após todas as compras</div>
+  <div style='position: absolute; left: {planejado_pct:.2f}%; transform: translateX(-50%); color: {cor_plan};'>🔮 Após Compras</div>
 </div>
 
 <!-- Barra visual -->
