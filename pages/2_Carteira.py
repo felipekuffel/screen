@@ -6,7 +6,9 @@ import re
 from datetime import datetime, date
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
+from screener.layout import aplicar_zoom
 
+aplicar_zoom(70)  # ou 80, 90, etc.
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
@@ -44,6 +46,37 @@ simulacoes_salvas = ref.get()
 
 if "simulacoes" not in st.session_state:
     st.session_state.simulacoes = simulacoes_salvas if simulacoes_salvas else []
+# Recalcula $ STOP e $ RISCO de todas simulações carregadas
+def recalcular_riscos(sim):
+    tabela_df = pd.DataFrame(sim["tabela"])
+    pl_total = sim["pl_total"]
+    risco_acumulado = 0.0
+
+    for i, row in tabela_df.iterrows():
+        try:
+            preco = float(str(row["ADD"]).replace("$", "").replace(",", ""))
+            qtd = float(str(row["QTD"]).replace(" UN", "").replace(",", ""))
+            stop_pct = float(str(row["STOP"]).replace("%", "").strip())
+        except:
+            continue
+
+        stop_price = preco * (1 - stop_pct / 100)
+        risco_valor = (preco - stop_price) * qtd
+        risco_pct_pl = -risco_valor / pl_total * 100 if pl_total else 0
+
+        tabela_df.at[i, "$ STOP"] = f"$ {stop_price:.2f}"
+        tabela_df.at[i, "$ RISCO"] = f"$ {-risco_valor:.2f}"
+        tabela_df.at[i, "RISCO"] = f"{risco_pct_pl:.2f}% PL"
+
+    sim["tabela"] = tabela_df.to_dict(orient="list")
+    return sim
+
+# Reprocessa todas simulações ao carregar
+for i in range(len(st.session_state.simulacoes)):
+    sim = st.session_state.simulacoes[i]
+    if "tabela" in sim:
+        sim = recalcular_riscos(sim)
+        st.session_state.simulacoes[i] = sim
 
 
 st.markdown("""
@@ -187,6 +220,9 @@ with st.expander("Expandir/Minimizar Planejamento", expanded=expanded_planning):
         cotacao = st.number_input("💲 Cotação Inicial de Compra", value=cotacao_default, step=0.01, format="%.2f", key="cotacao_live")
     with col3:
         venda_pct = st.number_input("🎯 % de Ganho para Venda", value=venda_pct_default, step=0.1, format="%.2f", key="venda_pct_live")
+        preco_alvo = st.session_state.cotacao_live * (1 + venda_pct / 100)
+        st.markdown(f"💰 <span style='font-size:15px;'>Preço alvo projetado: <strong>R$ {preco_alvo:.2f}</strong></span>", unsafe_allow_html=True)
+
     with col4:
         pl_total = st.number_input("💼 Capital Total (PL)", value=pl_total_default, step=100.0, key="pl_total_live")
     with col5:
@@ -241,6 +277,27 @@ with st.expander("Expandir/Minimizar Planejamento", expanded=expanded_planning):
                 stop_price = preco_entrada * (1 - stop_pct / 100) if preco_entrada else 0
                 label_stop = f"🛑 Stop (%) → ${stop_price:.2f}"
                 stop = st.number_input(label_stop, key=f"stop{i}", value=stop_pct, step=0.1)
+
+                # ✅ Cálculo do maior STOP permitido na compra 1 sozinha para ficar dentro de 1% do PL
+                if i == 0:
+                    preco1 = preco_entrada
+                    pct_pl1 = st.session_state.get("pct_pl0", 8.0)
+                    valor1 = st.session_state.pl_total_live * (pct_pl1 / 100)
+                    qtd1 = valor1 / preco1 if preco1 else 0
+
+                    risco_maximo_pct = st.session_state.get("risco_maximo_pct", 1.0)
+                    risco_max_total = st.session_state.pl_total_live * (risco_maximo_pct / 100)
+
+                    if qtd1 > 0:
+                        stop_price_max = preco1 - (risco_max_total / qtd1)
+                        stop_pct_max = (preco1 - stop_price_max) / preco1 * 100
+
+                        st.markdown(f"""
+                        <span style='font-size:15px;'>📉 Stop da <strong>COMPRA INICIAL</strong> pode ser 
+                        <strong>{stop_pct_max:.2f}%</strong> (R$ {stop_price_max:.2f}) para manter risco ≤ {risco_maximo_pct:.1f}% do PL</span>
+                        """, unsafe_allow_html=True)
+
+
 
             compra_data.append({
                 "nome": nome,
@@ -551,7 +608,7 @@ for idx, sim in enumerate(st.session_state.simulacoes):
             <div style='padding: 1rem; background-color: #e2f7d5; border-radius: 10px; font-size: 17px;'>
             <p><strong>Alocação Atual:</strong>&nbsp;&nbsp;<br>
             <strong>📦 Ações disponíveis para venda:</strong>  {total_disponivel} ações<br>
-            <strong>💰 Preço médio acumulado:</strong> {preco:.2f}<br>
+            <strong>💰 Preço médio acumulado:</strong> {preco_medio:.2f}<br>
             <strong>💸 Total investido nas compras reais:</strong>  {total_investido:.2f}<br>
             </div>
             """, unsafe_allow_html=True)
