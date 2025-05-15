@@ -483,40 +483,41 @@ with st.expander("Expandir/Minimizar Filtros", expanded=True):
         st.markdown("### 🔍 Screener")
         nome_filtro = st.text_input("💾 Nome do filtro personalizado", key="screener_nome_filtro_input")
 
-        # Initialize 'filtros_salvos' in session_state if it doesn't exist
-        if "filtros_salvos" not in st.session_state:
-            st.session_state.filtros_salvos = {}
-        
-        # Initialize 'selectbox_carregar_filtro_estado' if it's not already set (e.g., by the top-of-script reset)
-        if "selectbox_carregar_filtro_estado" not in st.session_state:
-            st.session_state.selectbox_carregar_filtro_estado = "Selecione..."
+# Initialize 'filtros_salvos' in session_state if it doesn't exist
+if "filtros_salvos" not in st.session_state:
+    st.session_state.filtros_salvos = {}
 
-        if st.button("📌 Salvar filtro atual"):
-            if st.session_state.filtro_nome_input:
-                filtro_dict = {
-                    "performance": st.session_state.get("filtro_performance", "Any"),
-                    "volume": st.session_state.get("filtro_volume", "Over 300K"),
-                    "sinal": st.session_state.get("filtro_sinal", "Nenhum"),
-                    "highlow": st.session_state.get("filtro_highlow", "Any"),
-                    "sma20": st.session_state.get("filtro_sma20", "Any"),
-                    "sma50": st.session_state.get("filtro_sma50", "Any"),
-                    "sma200": st.session_state.get("filtro_sma200", "Any"),
-                    "ordenamento": st.session_state.get("ordenamento", False),
-                    "sma200_crescente": st.session_state.get("sma200_crescente", False),
-                    "mostrar_vcp": st.session_state.get("mostrar_vcp", False)
-                }
+# Initialize 'selectbox_carregar_filtro_estado' if it's not already set (e.g., by the top-of-script reset)
+if "selectbox_carregar_filtro_estado" not in st.session_state:
+    st.session_state.selectbox_carregar_filtro_estado = "Selecione..."
 
-                uid = st.session_state.user["localId"]  # ou como estiver salvo seu user ID
-                path = f"filtros/{uid}/{st.session_state.filtro_nome_input}"
+if st.button("📌 Salvar filtro atual"):
+    if nome_filtro:
+        filtro_dict = {
+            "performance": st.session_state.get("filtro_performance", "Any"),
+            "volume": st.session_state.get("filtro_volume", "Over 300K"),
+            "sinal": st.session_state.get("filtro_sinal", "Nenhum"),
+            "highlow": st.session_state.get("filtro_highlow", "Any"),
+            "sma20": st.session_state.get("filtro_sma20", "Any"),
+            "sma50": st.session_state.get("filtro_sma50", "Any"),
+            "sma200": st.session_state.get("filtro_sma200", "Any"),
+            "ordenamento": st.session_state.get("ordenamento", False),
+            "sma200_crescente": st.session_state.get("sma200_crescente", False),
+            "mostrar_vcp": st.session_state.get("mostrar_vcp", False)
+        }
 
-                try:
-                    db.reference(path).set(filtro_dict)
-                    st.success(f"Filtro '{st.session_state.filtro_nome_input}' salvo com sucesso no Firebase!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao salvar no Firebase: {e}")
-            else:
-                st.warning("Por favor, insira um nome para o filtro.")
+        uid = st.session_state.user["localId"]
+        path = f"filtros/{uid}/{nome_filtro}"
+
+        try:
+            db.reference(path).set(filtro_dict)
+            st.success(f"Filtro '{nome_filtro}' salvo com sucesso no Firebase!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao salvar no Firebase: {e}")
+    else:
+        st.warning("Por favor, insira um nome para o filtro.")
+
 
         # Load filter selectbox
         # The list of options now directly uses st.session_state.filtros_salvos
