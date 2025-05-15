@@ -10,24 +10,29 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
 
 
 
-def aplicar_zoom(percentual=80):
+def aplicar_zoom(percentual=70):
     escala = percentual / 100
-    proporcao = 100 / escala  # ex: 100 / 0.7 = 143%
+    proporcao = 100 / escala
 
     st.markdown(f"""
         <style>
-        html, body {{
-            overflow: hidden;
+        /* Zoom padrão */
+        html {{
+            zoom: {percentual}%;
         }}
-        [data-testid="stApp"] {{
+
+        /* Fallback para navegadores que ignoram zoom */
+        body > div:first-child {{
             transform: scale({escala});
             transform-origin: top left;
-            position: fixed;
-            top: 0;
-            left: 0;
             width: {proporcao:.0f}%;
             height: {proporcao:.0f}%;
-            overflow: scroll;
+            overflow: auto;
+        }}
+
+        /* Ajuste visual para dropdowns renderizados fora do escopo */
+        [data-baseweb="popover"], [role="listbox"], [data-testid="stSelectbox"] {{
+            zoom: {percentual}%;
         }}
         </style>
     """, unsafe_allow_html=True)
