@@ -14,24 +14,21 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
 
-escala = percentual / 100
-proporcao = 100 / escala  # ex: 100 / 0.7 = 143%
-
-st.markdown(f"""
+st.markdown("""
     <style>
-    html, body {{
+    html, body {
         overflow: hidden;
-    }}
-    [data-testid="stApp"] {{
-        transform: scale({escala});
+    }
+    [data-testid="stApp"] {
+        transform: scale(0.7);
         transform-origin: top left;
         position: fixed;
         top: 0;
         left: 0;
-        width: {proporcao:.0f}%;
-        height: {proporcao:.0f}%;
+        width: 145%;
+        height: 145%;
         overflow: scroll;
-    }}
+    }
     </style>
 """, unsafe_allow_html=True)
 
