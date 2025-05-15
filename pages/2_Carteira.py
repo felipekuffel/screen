@@ -7,7 +7,7 @@ from datetime import datetime, date
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
 
-
+st.set_page_config(layout="wide")
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
