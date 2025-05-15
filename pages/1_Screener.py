@@ -27,14 +27,13 @@ import hashlib
 import json
 from Screener.layout import aplicar_zoom
 
-#st.set_page_config(layout="wide")
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
-aplicar_zoom(70) 
+
 # Carrega filtros do Firebase para o usuário logado (após login verificado!)
 # Sempre recarrega os filtros do Firebase após login
 try:
@@ -54,7 +53,7 @@ if st.session_state.get("reset_loader_selectbox_on_next_run", False):
         st.session_state.selectbox_carregar_filtro_estado = "Selecione..."
     st.session_state.reset_loader_selectbox_on_next_run = False
 
-
+aplicar_zoom(70) 
 st.markdown("""
     <style>
     [data-testid="stSidebar"]::before {
