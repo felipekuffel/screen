@@ -27,7 +27,7 @@ import hashlib
 import json
 from Screener.layout import aplicar_zoom
 
-aplicar_zoom(70)  # ou 80, 90, etc.
+aplicar_zoom(80)  # ou 80, 90, etc.
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
