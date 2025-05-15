@@ -481,7 +481,7 @@ with st.expander("Expandir/Minimizar Filtros", expanded=True):
 
     with col1:
         st.markdown("### 🔍 Screener")
-        nome_filtro = st.text_input("💾 Nome do filtro personalizado", key="filtro_nome_input") # Changed key to avoid conflict if "filtro_nome" is used elsewhere in session_state
+        nome_filtro = st.text_input("💾 Nome do filtro personalizado", key="screener_nome_filtro_input")
 
         # Initialize 'filtros_salvos' in session_state if it doesn't exist
         if "filtros_salvos" not in st.session_state:
