@@ -244,7 +244,7 @@ if not restore_session():  # Se não estiver logado
     st.stop()
 
 if "logged_in" in st.session_state and st.session_state.logged_in:
-    aplicar_zoom(70)) 
+    aplicar_zoom(70)
 
 # --- Se chegou aqui, o usuário está logado ---
 st.sidebar.success(f"Login como: {st.session_state.get('email', 'N/A')}")
