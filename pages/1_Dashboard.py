@@ -23,9 +23,9 @@ from contextlib import redirect_stdout, redirect_stderr
 import re
 from finvizfinance.screener.overview import Overview
 import requests
+from Screener.layout import aplicar_zoom
 
-st.set_page_config(layout="wide")
-
+aplicar_zoom(70)  # ou 80, 90, etc.
 
 
 # At the VERY TOP of your script, after imports:
