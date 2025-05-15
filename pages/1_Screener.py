@@ -28,25 +28,6 @@ import json
 
 st.set_page_config(layout="wide")
 
-
-st.markdown("""
-    <style>
-    html, body {
-        overflow: hidden;
-    }
-    [data-testid="stApp"] {
-        transform: scale(0.8);
-        transform-origin: top left;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 130%;
-        height: 130%;
-        overflow: scroll;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
