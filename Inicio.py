@@ -4,13 +4,13 @@ import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
 from cryptography.hazmat.primitives import serialization
+from screener.layout import aplicar_zoom
 
 # --- Configuração da Página ---
 st.set_page_config(
-    page_title="Painel de Análise",
-    layout="wide",
+    page_title="Painel de Análise"
 )
-
+aplicar_zoom(70) 
 st.markdown("""
     <style>
     [data-testid="stSidebar"]::before {
