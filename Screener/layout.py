@@ -10,7 +10,7 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
 
 
 
-def aplicar_zoom(percentual=80):
+def aplicar_zoom(percentual=70):
     escala = percentual / 100
     proporcao = 100 / escala
 
