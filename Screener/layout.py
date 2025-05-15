@@ -2,6 +2,13 @@
 
 import streamlit as st
 
+# Verifica se o usuário está autenticado
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
+    st.link_button("🔐 Ir para Login", "/")
+    st.stop()
+
+
 def aplicar_zoom(percentual=70):
     escala = percentual / 100
     proporcao = 100 / escala  # ex: 100 / 0.7 = 143%
