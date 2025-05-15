@@ -10,7 +10,6 @@ from Screener.layout import aplicar_zoom
 st.set_page_config(
     page_title="Painel de Análise"
 )
-aplicar_zoom(70) 
 st.markdown("""
     <style>
     [data-testid="stSidebar"]::before {
@@ -244,6 +243,7 @@ if not restore_session():  # Se não estiver logado
     page_login_registration()
     st.stop()
 
+aplicar_zoom(70) 
 
 # --- Se chegou aqui, o usuário está logado ---
 st.sidebar.success(f"Login como: {st.session_state.get('email', 'N/A')}")
