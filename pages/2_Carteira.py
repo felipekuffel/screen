@@ -504,27 +504,41 @@ for idx, sim in enumerate(st.session_state.simulacoes):
 
     alerta = ""
    
+    try:
     compra_2_pct = float(sim["tabela"]["% PARA COMPRA"][1].replace('%', ''))
-    compra_3_pct = float(sim["tabela"]["% PARA COMPRA"][2].replace('%', ''))
     preco_2 = sim["cotacao"] * (1 + compra_2_pct / 100)
+except:
+    compra_2_pct = None
+    preco_2 = None
+
+try:
+    compra_3_pct = float(sim["tabela"]["% PARA COMPRA"][2].replace('%', ''))
     preco_3 = sim["cotacao"] * (1 + compra_3_pct / 100)
+except:
+    compra_3_pct = None
+    preco_3 = None
 
-    if valor_atual < preco_2:
-        alerta = " Em faixa da COMPRA INICIAL 🟢"
-        falta_pct = (preco_2 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"  {falta_pct:.2f}%   para  COMPRA 2 (R$ {preco_2:.2f})"
-        sinal_proxima = f" 🟢"
-    elif valor_atual < preco_3:
-        alerta = "🟡 Em faixa da COMPRA 2"
-        falta_pct = (preco_3 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"{falta_pct:.2f}%  para  COMPRA 3 (R$ {preco_3:.2f})"
-        sinal_proxima = f"🟡"
-
-    else:
-        alerta = "🟠 Em faixa da COMPRA 3 ou acima"
-        aviso_proxima = ""
-        sinal_proxima = f"🟠"
-
+# Avaliação de faixas
+if preco_2 is not None and valor_atual < preco_2:
+    alerta = "🟢 Em faixa da COMPRA INICIAL"
+    falta_pct = (preco_2 - valor_atual) / valor_atual * 100
+    aviso_proxima = f"{falta_pct:.2f}% para COMPRA 2 (R$ {preco_2:.2f})"
+    sinal_proxima = "🟢"
+elif preco_3 is not None and valor_atual < preco_3:
+    alerta = "🟡 Em faixa da COMPRA 2"
+    falta_pct = (preco_3 - valor_atual) / valor_atual * 100
+    aviso_proxima = f"{falta_pct:.2f}% para COMPRA 3 (R$ {preco_3:.2f})"
+    sinal_proxima = "🟡"
+elif preco_3 is not None and valor_atual >= preco_3:
+    excesso_pct = (valor_atual / preco_3 - 1) * 100
+    excesso_valor = valor_atual - preco_3
+    alerta = f"🔺 {excesso_pct:.2f}% acima da COMPRA 3 (${excesso_valor:.2f})"
+    aviso_proxima = ""
+    sinal_proxima = "🔺"
+else:
+    alerta = "ℹ️ Sem dados de COMPRA 3"
+    aviso_proxima = ""
+    sinal_proxima = "ℹ️"
 
     destaque_cor = "#e6fff2"
     if valor_atual >= preco_final:
