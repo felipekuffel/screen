@@ -40,8 +40,8 @@ st.markdown("""
         position: fixed;
         top: 0;
         left: 0;
-        width: 145%;
-        height: 145%;
+        width: 140%;
+        height: 140%;
         overflow: scroll;
     }
     </style>
