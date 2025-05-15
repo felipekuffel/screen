@@ -8,7 +8,7 @@ from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
 from Screener.layout import aplicar_zoom
 
-aplicar_zoom(60)  # ou 80, 90, etc.
+aplicar_zoom(75)  # ou 80, 90, etc.
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
