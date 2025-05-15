@@ -25,8 +25,9 @@ from finvizfinance.screener.overview import Overview
 import requests
 import hashlib
 import json
+from Screener.layout import aplicar_zoom
 
-st.set_page_config(layout="wide")
+aplicar_zoom(70)  # ou 80, 90, etc.
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
