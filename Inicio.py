@@ -5,11 +5,6 @@ import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
 from cryptography.hazmat.primitives import serialization
 
-# ✅ Verifica login antes de qualquer coisa
-if "logged_in" not in st.session_state or not st.session_state.logged_in:
-    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
-    st.link_button("🔐 Ir para Login", "/")
-    st.stop()
 
 # --- Configuração da Página ---
 st.set_page_config(
