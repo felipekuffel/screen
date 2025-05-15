@@ -173,10 +173,8 @@ else:
 
 
 with st.container():
-    st.markdown("""
-        <div style='background-color: #dfefff; padding: 1px; border-radius: 7px; border: 1px solid #b3d8ff;'>
-        <h4>📝 Novo Planejamento de Compra</h4>
-    """, unsafe_allow_html=True)
+    st.subheader("📈✍ Planejar Nova Compra")
+
 expanded_planning = st.session_state.get("open_planning_expander", False)
 
 with st.expander("Expandir/Minimizar Planejamento", expanded=expanded_planning):
@@ -439,7 +437,10 @@ for idx, sim in enumerate(st.session_state.simulacoes):
 
 
     progresso_pct = (valor_atual / preco_medio - 1) * 100 if preco_medio else 0
+    
     progresso_ate_meta = ((valor_atual - preco_medio) / (preco_final - preco_medio)) * 100 if (preco_final - preco_medio) else 0
+    if progresso_pct < 0:
+            progresso_ate_meta *= 2  # Multiplica por 2 se o lucro for negativo
     restante_para_meta = ((preco_final - valor_atual) / valor_atual) * 100 if valor_atual else 0
 
     cor_progresso = "#28a745" if progresso_pct >= 0 else "#dc3545"
@@ -892,36 +893,6 @@ for sim in st.session_state.simulacoes:
 rr_ratio = lucro_estimado_total / total_risco_compras_reais if total_risco_compras_reais else 0
 qtd_simulacoes = len(st.session_state.simulacoes)
 
-# Apresentação em 2 colunas estilizadas
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown(f"""
-    <div style='padding: 1rem; background-color: #eef5f9; border-radius: 10px; font-size: 17px;'>
-        <strong>💰 Lucro estimado total:</strong> $ {lucro_estimado_total:,.2f}<br>
-        <strong>📉 Risco total real:</strong> $ {total_risco_compras_reais:,.2f}<br>
-        <strong>📈 R/R médio esperado:</strong> {rr_ratio:.2f}
-
-    </div>
-    """, unsafe_allow_html=True)
-
-
-with col2:
-    st.markdown(f"""
-    <div style='padding: 1rem; background-color: #eef9f1; border-radius: 10px; font-size: 17px;'>
-        <strong>📁 Simulações em aberto:</strong> {qtd_simulacoes}<br>
-        <strong>📊 PL comprometido nas compras:</strong> {total_pct_pl_executado:.2f}%<br>
-        <strong>💼 PL necessário após todas as compras:</strong> {total_pct_pl_planejado:.2f}%
-
-    </div>
-    """, unsafe_allow_html=True)
-
-
-
-
-
-
-
 
 # Inicializa valores acumulados
 valor_investido_total = 0
@@ -950,7 +921,105 @@ if faixa_total == 0:
 
 # Calcula posição relativa atual entre -risco e +lucro
 progresso_pct = faixa_total / lucro_real
-posicao_pct = max(2, min(98, progresso_pct))
+posicao = 49 + progresso_pct
+posicao_pct = max(2, min(98, posicao))
+
+# Determina cor e sinal
+cor_valor = "#28a745" if lucro_real >= 0 else "#dc3545"
+sinal = "+" if lucro_real >= 0 else "-"
+
+# Recalcula faixa com base no risco planejado e lucro estimado
+lucro_estimado_total = sum([sim.get("lucro", 0) for sim in st.session_state.simulacoes])
+total_risco_compras_reais = 0.0  # Renomeado para maior clareza
+for sim in st.session_state.simulacoes:
+    pl_total = sim["pl_total"]
+    tabela_df = pd.DataFrame(sim["tabela"])
+    for compra in sim.get("compras_reais", []):
+        preco = compra["preco"]
+        qtd = compra["qtd"]
+        etapa = compra["etapa"]
+        etapa_nome = f"COMPRA {etapa}" if etapa in ["2", "3"] else "COMPRA INICIAL"
+        try:
+            linha = tabela_df[tabela_df["Etapa"] == etapa_nome].iloc[0]
+            stop_pct = float(str(linha["STOP"]).replace("%", ""))
+        except:
+            stop_pct = 8.0
+        stop_price = preco * (1 - stop_pct / 100)
+        risco = (preco - stop_price) * qtd
+        total_risco_compras_reais += risco
+
+faixa_total = total_risco_compras_reais + lucro_estimado_total
+if faixa_total == 0:
+    faixa_total = 1
+
+# Calcula a posição percentual do lucro real na faixa total
+posicao_pct = ((total_risco_compras_reais + lucro_real) / (2 * faixa_total)) * 100
+posicao_pct = max(0, min(100, posicao_pct))
+
+# Determina cor e sinal
+cor_valor = "#28a745" if lucro_real >= 0 else "#dc3545"
+sinal = "+" if lucro_real >= 0 else "-"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Recalcula faixa com base no risco planejado e lucro estimado
+lucro_estimado_total = sum([sim.get("lucro", 0) for sim in st.session_state.simulacoes])
+total_risco_compras_reais = 0.0
+total_risco_operacao = 0.0  # Novo: Risco total planejado
+
+for sim in st.session_state.simulacoes:
+    pl_total = sim["pl_total"]
+    tabela_df = pd.DataFrame(sim["tabela"])
+
+    # Risco das compras REAIS
+    for compra in sim.get("compras_reais", []):
+        preco = compra["preco"]
+        qtd = compra["qtd"]
+        etapa = compra["etapa"]
+        etapa_nome = f"COMPRA {etapa}" if etapa in ["2", "3"] else "COMPRA INICIAL"
+        try:
+            linha = tabela_df[tabela_df["Etapa"] == etapa_nome + " - Real"].iloc[0]  # Busca a linha "Real"
+            stop_pct = float(str(linha["STOP"]).replace("%", ""))
+        except:
+            stop_pct = float(str(tabela_df[tabela_df["Etapa"] == etapa_nome]["STOP"].values[0]).replace("%", ""))
+        stop_price = preco * (1 - stop_pct / 100)
+        risco = (preco - stop_price) * qtd
+        total_risco_compras_reais += risco
+
+    # Risco total da OPERAÇÃO (planejado)
+    for i in range(len(tabela_df)):
+        try:
+            preco_str = str(tabela_df.loc[i, "ADD"]).replace("$", "").replace(",", "")
+            preco = float(preco_str)
+            qtd_str = str(tabela_df.loc[i, "QTD"]).replace(" UN", "").replace(",", "")
+            qtd = float(qtd_str)
+            stop_pct_str = str(tabela_df.loc[i, "STOP"]).replace("%", "")
+            stop_pct = float(stop_pct_str)
+            stop_price = preco * (1 - stop_pct / 100)
+            risco = (preco - stop_price) * qtd
+            total_risco_operacao += risco
+        except ValueError:
+            continue
+
+faixa_total = total_risco_operacao + lucro_estimado_total
+if faixa_total == 0:
+    faixa_total = 1
+
+# Calcula a posição percentual do lucro real na faixa total
+progresso_pct = (lucro_real / faixa_total) * 100
+posicao_pct = 50 + (lucro_real / (2 * faixa_total)) * 100
+posicao_pct = max(0, min(100, posicao_pct))
 
 # Determina cor e sinal
 cor_valor = "#28a745" if lucro_real >= 0 else "#dc3545"
@@ -958,23 +1027,155 @@ sinal = "+" if lucro_real >= 0 else "-"
 
 # Mostra barra com valor atual e posição visual
 st.markdown("---")
-st.markdown("### ⚖️ Lucro Real x Risco Planejado")
+st.markdown(f"""
+    <div font-size: 17px;'>
+        <strong>⚖️ Balança das posições em aberto (R/R {rr_ratio:.2f}) <br>
+        <br>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown(f"""
-<div style='text-align:center; font-size:18px; margin-bottom:5px; color:{cor_valor};'>
-    {sinal}${abs(lucro_real):,.2f} ({progresso_pct:.1f}% do objetivo)
-</div>
-
 <div style='position: relative; width: 100%; height: 30px; background: linear-gradient(to right, #dc3545, #6c757d, #28a745); 
             border-radius: 10px; margin-bottom: 5px;'>
-    <div style='position: absolute; left: {posicao_pct}%; top: -14px; transform: translateX(-50%); font-size: 22px;'>▲</div>
-    <div style='position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background-color: #ffffff77;'></div>
+    <div style='position: absolute; left: {posicao_pct}%;bottom: -30px; transform: translateX(-50%); font-weight: bold; font-size: 14px; color:{cor_valor};'>
+    {sinal}${abs(lucro_real):,.2f}</div>
+        <div style='position: absolute; left: {posicao_pct}%; top: -30px; transform: translateX(-50%); font-weight: bold; font-size: 14px; color:{cor_valor};'>{progresso_pct:.1f}%</div>
+<div style='position: absolute; left: {posicao_pct}%; top: 0; bottom: 0; width: 3px; background-color: #ffffff77;'></div>
 </div>
-<div style='display: flex; justify-content: space-between; font-size: 16px;'>
-    <span style='color: #dc3545;'>📉 -${risco_total:,.0f}</span>
+<div style='position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background-color: #ffffff77;'></div>
+</div>
+<div style='display: flex; justify-content: space-between; font-size: 14px;'>
+    <span style='color: #dc3545;'>📉 -${total_risco_compras_reais:,.0f}</span>
     <span style='color: #28a745;'>+${lucro_estimado_total:,.0f} 💰</span>
 </div>
 """, unsafe_allow_html=True)
+
+
+
+
+
+
+
+
+
+
+
+# Cálculo das posições percentuais e cores
+pl_executado = total_pct_pl_executado
+pl_planejado = total_pct_pl_planejado
+barra_max = max(pl_planejado, pl_executado, 100, 150)
+
+executado_pct = (pl_executado / barra_max) * 100
+planejado_pct = (pl_planejado / barra_max) * 100
+ideal_pct = (100 / barra_max) * 100
+
+cor_barra = "#28a745" if pl_planejado <= 100 else "#ffc107" if pl_planejado <= 120 else "#dc3545"
+cor_exec = "#006400"
+cor_plan = "#ff8c00"
+
+
+
+
+# Cabeçalho
+st.markdown("---")
+st.markdown(f"""
+    <div font-size: 17px;'>
+        <strong> 🧮 Comprometimento do PL Projetado (Qnt Atual: {qtd_simulacoes} ativos)<br>
+        <br>
+    </div>
+    """, unsafe_allow_html=True)
+# Renderiza barra com legenda
+st.markdown(f"""
+<!-- Legenda acima -->
+<div style='position: relative; width: 100%; height: 25px; font-weight: bold; margin-bottom: 4px; font-size: 14px;'>
+  <div style='position: absolute; left: {executado_pct:.2f}%; transform: translateX(-50%); color: {cor_exec};'>📍 Compras atuais</div>
+  <div style='position: absolute; left: {planejado_pct:.2f}%; transform: translateX(-50%); color: {cor_plan};'>🔮 Após todas as compras</div>
+</div>
+
+<!-- Barra visual -->
+<div style='position: relative; width: 100%; height: 30px; 
+             background: linear-gradient(to right, #e2f7d5, #fff3cd, #f8d7da); 
+             border-radius: 10px; margin-bottom: 30px;'>
+
+  <!-- Executado -->
+  <div style='position: absolute; left: {executado_pct:.2f}%; bottom: -26px; 
+              transform: translateX(-50%); font-size: 14px; color: {cor_exec};'>
+      {pl_executado:.1f}%
+  </div>
+  <div style='position: absolute; left: {executado_pct:.2f}%; top: 0; bottom: 0; 
+              width: 2px; background-color: {cor_exec};'></div>
+
+  <!-- Planejado -->
+  <div style='position: absolute; left: {planejado_pct:.2f}%; bottom: -26px; 
+              transform: translateX(-50%); font-size: 14px; color: {cor_plan};'>
+      {pl_planejado:.1f}%
+  </div>
+  <div style='position: absolute; left: {planejado_pct:.2f}%; top: 0; bottom: 0; 
+              width: 2px; background-color: {cor_plan};'></div>
+
+  <!-- Ideal -->
+  <div style='position: absolute; left: {ideal_pct:.2f}%; top: 0; bottom: 0; 
+              width: 1px; background-color: #6f6f6f;'></div>
+</div>
+
+<!-- Escala com marcador alinhado à barra de 100% -->
+<div style='position: relative; width: 100%; height: 20px; margin-top: -10px; font-size: 15px;'>
+  <div style='position: absolute; left: 0%;'>0%</div>
+  <div style='position: absolute; left: {ideal_pct:.2f}%; transform: translateX(-50%); color: #333;'>🎯 100% do PL</div>
+  <div style='position: absolute; right: 0%; text-align: right;'>{barra_max:.0f}% Alavancado</div>
+</div>
+
+""", unsafe_allow_html=True)
+
+
+
+
+
+
+
+import streamlit as st
+
+# DASHBOARD DE RANKING (Adicione este bloco ao final do seu arquivo)
+st.markdown("---")
+st.subheader("🏆 Ranking de Ativos por Progresso")
+
+ativos_progresso = []
+max_progresso_abs = 0  # Encontra o maior valor absoluto para normalizar
+for sim in st.session_state.simulacoes:
+    nome = sim["nome"]
+    preco_medio = sim.get("preco_medio", 0)
+    preco_final = sim.get("preco_final", 0)
+    valor_atual = get_preco_atual(nome) or sim.get("preco_medio", 0)
+    progresso_ate_meta = ((valor_atual - preco_medio) / (preco_final - preco_medio)) * 100 if (preco_final - preco_medio) else 0
+    if progresso_ate_meta < 0:
+        progresso_ate_meta *= 2  # Multiplica por 2 se o lucro for negativo
+    ativos_progresso.append({"nome": nome, "progresso": progresso_ate_meta})
+    max_progresso_abs = max(max_progresso_abs, abs(progresso_ate_meta))
+
+ativos_ordenados = sorted(ativos_progresso, key=lambda x: x["progresso"], reverse=True)
+
+for i, ativo in enumerate(ativos_ordenados):
+    nome = ativo["nome"]
+    progresso = ativo["progresso"]
+    progresso_normalizado = (progresso / max_progresso_abs) * 50 if max_progresso_abs else 0
+    largura_barra = abs(progresso_normalizado)
+    direcao = "50%" if progresso >= 0 else f'calc(50% - {largura_barra}%)'
+    cor_barra = "#28a745" if progresso >= 0 else "#dc3545"
+
+    html = f"""
+    <div style='margin-bottom: 24px; padding: 10px; border-radius: 8px; background-color: #f8f9fa;'>
+        <div style='font-size: 15px; margin-bottom: 6px;'><strong>{i + 1}. {nome}</strong> | Progresso: {progresso:.1f}%</div>
+        <div style='position: relative; height: 16px; background-color: #e9ecef; border-radius: 8px;'>
+            <div style='position: absolute; left: {direcao}; top: 0; bottom: 0; width: {largura_barra}%;
+                        background-color: {cor_barra}; border-radius: 8px;'></div>
+            <div style='position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background-color: #00000044;'></div>
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+
+
 
 
 
