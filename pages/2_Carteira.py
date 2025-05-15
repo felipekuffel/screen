@@ -519,26 +519,37 @@ for idx, sim in enumerate(st.session_state.simulacoes):
         preco_3 = None
     
     # Avaliação de faixas
-    if preco_2 is not None and valor_atual < preco_2:
-        alerta = "🟢 Em faixa da COMPRA INICIAL"
-        falta_pct = (preco_2 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"{falta_pct:.2f}% para COMPRA 2 (R$ {preco_2:.2f})"
-        sinal_proxima = "🟢"
-    elif preco_3 is not None and valor_atual < preco_3:
-        alerta = "🟡 Em faixa da COMPRA 2"
-        falta_pct = (preco_3 - valor_atual) / valor_atual * 100
-        aviso_proxima = f"{falta_pct:.2f}% para COMPRA 3 (R$ {preco_3:.2f})"
-        sinal_proxima = "🟡"
-    elif preco_3 is not None and valor_atual >= preco_3:
-        excesso_pct = (valor_atual / preco_3 - 1) * 100
-        excesso_valor = valor_atual - preco_3
-        alerta = f"🔺 {excesso_pct:.2f}% acima da COMPRA 3 (${excesso_valor:.2f})"
+    try:
+        tabela_df = pd.DataFrame(sim["tabela"])
+        
+        preco_2 = sim["cotacao"] * (float(tabela_df[tabela_df["Etapa"].str.startswith("COMPRA 2")]["% PARA COMPRA"].iloc[0].replace('%','')) / 100 + 1)
+        
+        linha_compra3 = tabela_df[tabela_df["Etapa"].str.startswith("COMPRA 3")].iloc[0]
+        preco_3 = float(str(linha_compra3["ADD"]).replace("$", "").replace(",", ""))
+        
+        if valor_atual < preco_2:
+            alerta = "🟢 Em faixa da COMPRA INICIAL"
+            falta_pct = (preco_2 - valor_atual) / valor_atual * 100
+            aviso_proxima = f"{falta_pct:.2f}% para COMPRA 2 (R$ {preco_2:.2f})"
+            sinal_proxima = "🟢"
+    
+        elif valor_atual < preco_3:
+            alerta = "🟡 Em faixa da COMPRA 2"
+            falta_pct = (preco_3 - valor_atual) / valor_atual * 100
+            aviso_proxima = f"{falta_pct:.2f}% para COMPRA 3 (R$ {preco_3:.2f})"
+            sinal_proxima = "🟡"
+    
+        else:
+            acima_pct = ((valor_atual - preco_3) / preco_3) * 100
+            alerta = f"🔴 Preço acima da COMPRA 3 em {abima_pct:.2f}% (R$ {preco_3:.2f})"
+            aviso_proxima = ""
+            sinal_proxima = "🔴"
+    
+    except Exception as e:
+        alerta = "⚠️ Erro ao calcular faixa de preço"
         aviso_proxima = ""
-        sinal_proxima = "🔺"
-    else:
-        alerta = "ℹ️ Sem dados de COMPRA 3"
-        aviso_proxima = ""
-        sinal_proxima = "ℹ️"
+        sinal_proxima = "⚠️"
+
 
     destaque_cor = "#e6fff2"
     if valor_atual >= preco_final:
