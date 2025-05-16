@@ -1200,9 +1200,13 @@ if executar:
     st.dataframe(df_final, use_container_width=True)
     st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
 
-    # 🔄 Salvamento do histórico
+   if executar and st.session_state.recomendacoes:
     try:
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
+
+        if not tickers_limpos:
+            st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
+            st.stop()
 
         def limpar_chave_firebase(s: str) -> str:
             return re.sub(r'[.$#\[\]/]', '_', s)
@@ -1229,6 +1233,7 @@ if executar:
         st.success("✅ Histórico salvo com sucesso!")
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
+
 
 
 with st.expander("🕓 Histórico de Buscas"):
