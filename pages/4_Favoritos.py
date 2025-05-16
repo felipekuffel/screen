@@ -5,6 +5,21 @@ import numpy as np
 from streamlit_javascript import st_javascript
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
+
+# Inicializa Firebase Admin se ainda não foi feito
+if not firebase_admin._apps:
+    from firebase_admin import credentials
+    cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": st.secrets["databaseURL"]
+    })
+    
+# Verifica se o usuário está autenticado
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
+    st.link_button("🔐 Ir para Login", "/")
+    st.stop()
+    
 def calcular_indicadores(df, length=20, momentum_threshold=0.07):
     df = df.dropna(subset=['Open', 'High', 'Low', 'Close'])
     df = df[(df['High'] > df['Low']) & (df['Open'] != df['Close'])]
@@ -455,13 +470,7 @@ def plot_ativo(df, ticker, nome_empresa, vcp_detectado=False):
 
 
 
-# Inicializa Firebase Admin se ainda não foi feito
-if not firebase_admin._apps:
-    from firebase_admin import credentials
-    cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
-    firebase_admin.initialize_app(cred, {
-        "databaseURL": st.secrets["databaseURL"]
-    })
+
 
 # --- Função carregadora do benchmark ---
 @st.cache_data(ttl=3600)
@@ -474,11 +483,7 @@ def carregar_spy():
     else:
         return None
 
-# Verifica se o usuário está autenticado
-if "logged_in" not in st.session_state or not st.session_state.logged_in:
-    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
-    st.link_button("🔐 Ir para Login", "/")
-    st.stop()
+
 
 st.title("⭐ Favoritos Salvos")
 
