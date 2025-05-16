@@ -237,18 +237,23 @@ def calcular_pivot_points(df):
 def get_quarterly_growth_table_yfinance(ticker):
     ticker_obj = yf.Ticker(ticker)
     df = ticker_obj.quarterly_financials.T
+
     if df.empty or "Total Revenue" not in df.columns or "Net Income" not in df.columns:
         return None
+
     df = df[["Total Revenue", "Net Income"]].dropna()
     df.sort_index(ascending=False, inplace=True)
+
     rows = []
-    for i in range(4):
+    for i in range(5):  # agora inclui 5 trimestres
         try:
             atual = df.iloc[i]
             trimestre_data = df.index[i].date()
             receita_atual = atual["Total Revenue"]
             lucro_atual = atual["Net Income"]
-            receita_pct = lucro_pct = None
+
+            receita_pct = None
+            lucro_pct = None
             if i + 4 < len(df):
                 receita_ant = df.iloc[i + 4]["Total Revenue"]
                 lucro_ant = df.iloc[i + 4]["Net Income"]
@@ -256,11 +261,15 @@ def get_quarterly_growth_table_yfinance(ticker):
                     receita_pct = (receita_atual - receita_ant) / receita_ant * 100
                 if lucro_ant:
                     lucro_pct = (lucro_atual - lucro_ant) / abs(lucro_ant) * 100
+
             margem = (lucro_atual / receita_atual) * 100 if receita_atual else None
+
             def fmt_pct(val):
-                if val is None: return ""
+                if val is None:
+                    return ""
                 emoji = " 🚀" if val > 18 else ""
                 return f"{val:+.1f}%{emoji}"
+
             rows.append({
                 "Trimestre": trimestre_data.strftime("%b %Y"),
                 "Receita (B)": f"${receita_atual / 1e9:.2f}B",
@@ -271,7 +280,9 @@ def get_quarterly_growth_table_yfinance(ticker):
             })
         except Exception:
             continue
-    return pd.DataFrame(rows).set_index("Trimestre")
+
+    df_final = pd.DataFrame(rows).set_index("Trimestre")
+    return df_final
 
 
 def highlight_niveis(row):
