@@ -25,10 +25,42 @@ from finvizfinance.screener.overview import Overview
 import requests
 import hashlib
 import json
+from streamlit_javascript import st_javascript
+from firebase_admin import credentials, auth as admin_auth, db
+import firebase_admin
 
 st.set_page_config(layout="wide")
 
-# Verifica se o usuário está autenticado
+# Inicializa Firebase Admin se ainda não foi inicializado
+if not firebase_admin._apps:
+    cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": st.secrets["databaseURL"]
+    })
+
+# Tenta restaurar a sessão via cookie se não estiver logado
+if "logged_in" not in st.session_state:
+    cookie_str = st_javascript("document.cookie")
+    token = None
+    if cookie_str:
+        for item in cookie_str.split(";"):
+            if item.strip().startswith("idToken="):
+                token = item.strip().split("=")[1]
+                break
+
+    if token:
+        try:
+            decoded = admin_auth.verify_id_token(token)
+            user_data = {
+                "localId": decoded["uid"],
+                "email": decoded["email"]
+            }
+            st.session_state.logged_in = True
+            st.session_state.user = user_data
+        except Exception:
+            st.warning("⚠️ Sessão inválida ou expirada. Faça login novamente.")
+
+# Bloqueia acesso se ainda não estiver autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
@@ -101,6 +133,79 @@ def get_earnings_info_detalhado(ticker):
         return "Indisponível", None, None
     except Exception as e:
         return f"Erro: {e}", None, None
+    
+
+def calcular_rs_rating(df_ativo, df_bench, ticker=None, log_ativo=False):
+    df_ativo = df_ativo.sort_index().copy()
+    df_bench = df_bench.sort_index().copy()
+
+    def calc_perf(df, dias):
+        if len(df) > dias:
+            return df['Close'].iloc[-1] / df['Close'].iloc[-dias]
+        else:
+            return np.nan
+
+    perf_ativo = {
+        "63": calc_perf(df_ativo, 63),
+        "126": calc_perf(df_ativo, 126),
+        "189": calc_perf(df_ativo, 189),
+        "252": calc_perf(df_ativo, 252),
+    }
+
+    perf_bench = {
+        "63": calc_perf(df_bench, 63),
+        "126": calc_perf(df_bench, 126),
+        "189": calc_perf(df_bench, 189),
+        "252": calc_perf(df_bench, 252),
+    }
+
+    if any(np.isnan(list(perf_ativo.values()))) or any(np.isnan(list(perf_bench.values()))):
+        return None
+
+    rs_stock = 0.4 * perf_ativo["63"] + 0.2 * perf_ativo["126"] + 0.2 * perf_ativo["189"] + 0.2 * perf_ativo["252"]
+    rs_ref   = 0.4 * perf_bench["63"] + 0.2 * perf_bench["126"] + 0.2 * perf_bench["189"] + 0.2 * perf_bench["252"]
+    total_rs_score = (rs_stock / rs_ref) * 100
+
+    # Tabela de faixas baseada na curva do script original
+    thresholds = [
+        (198.0, 99),
+        (120.0, 90),
+        (100.0, 70),
+        (91.5, 50),
+        (81.0, 30),
+        (53.5, 10),
+        (25.0, 1),
+    ]
+
+    for i in range(len(thresholds) - 1):
+        upper, rating_upper = thresholds[i]
+        lower, rating_lower = thresholds[i + 1]
+        if lower <= total_rs_score < upper:
+            rating_final = round(rating_lower + (rating_upper - rating_lower) * (total_rs_score - lower) / (upper - lower))
+            if log_ativo and ticker:
+                print(f"Ticker: {ticker} | RS Score: {total_rs_score:.2f} → Rating: {rating_final}")
+            return rating_final
+
+    rating_final = 99 if total_rs_score >= thresholds[0][0] else 1
+    if log_ativo and ticker:
+        print(f"Ticker: {ticker} | RS Score: {total_rs_score:.2f} → Rating: {rating_final}")
+    return rating_final
+
+
+
+@st.cache_data(ttl=3600)
+def carregar_spy():
+    df_spy = yf.download('^GSPC', period="18mo", interval="1d", progress=False)
+    if df_spy is not None and not df_spy.empty:
+        if isinstance(df_spy.columns, pd.MultiIndex):
+            df_spy.columns = df_spy.columns.droplevel(1)
+        return df_spy
+    else:
+        return None
+
+df_spy = carregar_spy()
+
+
 
 
 def plot_ativo(df, ticker, nome_empresa, vcp_detectado=False):
@@ -657,6 +762,7 @@ if current_sma200_filter and current_sma200_filter != "Any":
     filters_dict["200-Day Simple Moving Average"] = current_sma200_filter
 
 
+filtros_aplicados_str_legivel = f"Sinal: {st.session_state.get('filtro_sinal', 'Nenhum')}, Perf.: {filters_dict.get('Performance', '')}, Volume: {filters_dict.get('Average Volume', '')}"
 
 
 def inserir_preco_no_meio(niveis: list, preco: float) -> pd.DataFrame:
@@ -697,9 +803,6 @@ def inserir_preco_no_meio(niveis: list, preco: float) -> pd.DataFrame:
 
 
 
-
-
-
 if "recarregar_tickers" in st.session_state:
     tickers = st.session_state.pop("recarregar_tickers")
     st.session_state.recomendacoes = []
@@ -719,6 +822,7 @@ if "recarregar_tickers" in st.session_state:
             return ["color: #9467bd; font-style: italic;"] * len(row)
         return [""] * len(row)
 
+
     for i, ticker in enumerate(tickers):
         status_text_recarregar.text(f"🔁 Recarregando {ticker} ({i+1}/{len(tickers)})...")
         try:
@@ -726,6 +830,15 @@ if "recarregar_tickers" in st.session_state:
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.droplevel(1)
             df = calcular_indicadores(df, dias_breakout, threshold)
+
+            try:
+                rs_rating = calcular_rs_rating(df, df_spy)
+            except Exception as e:
+                st.warning(f"{ticker} com erro no RS Rating: {e}")
+                continue
+
+            df["RS_Rating"] = rs_rating if rs_rating is not None else np.nan
+
             vcp_detectado = detectar_vcp(df)
             nome = yf.Ticker(ticker).info.get("shortName", ticker)
             risco = avaliar_risco(df)
@@ -743,7 +856,16 @@ if "recarregar_tickers" in st.session_state:
                 with col2:
                     st.markdown(comentario)
                     st.markdown(f"📅 **Resultado:** {earnings_str}")
-                    st.markdown(f"📉 **Risco:** `{risco}`")
+                    st.markdown(f"📉 Risco (1 a 10): **{risco}**")
+
+                    rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns else None
+                    if rs_val is not None and not pd.isna(rs_val):
+                        st.markdown(f"💪 RS Rating (1 a 99): **{int(rs_val)}**")
+                    else:
+                        st.markdown("💪 RS Rating: ❌ Não disponível")
+
+
+
 
                     preco = df["Close"].iloc[-1]
                     PP, suportes, resistencias = calcular_pivot_points(df)
@@ -807,11 +929,38 @@ if "recarregar_tickers" in st.session_state:
                     styled_table = df_niveis.style.apply(highlight_niveis, axis=1)
                     st.dataframe(styled_table, use_container_width=True, height=565)
                     df_resultado = get_quarterly_growth_table_yfinance(ticker)
+                    try:
+                        dist_sma20 = df_niveis.loc["🟣 SMA 20", "Distância"]
+                    except KeyError:
+                        dist_sma20 = "N/A"
+
+                    try:
+                        dist_sma50 = df_niveis.loc["🟣 SMA 50", "Distância"]
+                    except KeyError:
+                        dist_sma50 = "N/A"
+
+                    try:
+                        dist_sma200 = df_niveis.loc["🟣 SMA 200", "Distância"]
+                    except KeyError:
+                        dist_sma200 = "N/A"
+
+                    try:
+                        dist_max52 = df_niveis.loc["📈 Máxima 52s", "Distância"]
+                    except KeyError:
+                        dist_max52 = "N/A"
+
+                    try:
+                        dist_min52 = df_niveis.loc["📉 Mínima 52s", "Distância"]
+                    except KeyError:
+                        dist_min52 = "N/A"
+
                     if df_resultado is not None:
                         st.markdown("📊 **Histórico Trimestral (YoY)**")
                         st.table(df_resultado)
                     else:
                         st.warning("❌ Histórico de crescimento YoY não disponível.")
+                    
+                    
 
 
 
@@ -821,7 +970,16 @@ if "recarregar_tickers" in st.session_state:
                 "Risco": risco,
                 "Tendência": tendencia,
                 "Comentário": comentario,
-                "Earnings": earnings_str
+                "Earnings": earnings_str,
+                "RS Rating": int(rs_val) if rs_val is not None and not pd.isna(rs_val) else "N/A",
+                "Dist % SMA20": dist_sma20,
+                "Dist % SMA50": dist_sma50,
+                "Dist % SMA200": dist_sma200,
+                "Dist % Máx52s": dist_max52,
+                "Dist % Mín52s": dist_min52,
+                "Filtros": filtros_aplicados_str_legivel
+
+
             })
         except Exception as e:
             st.warning(f"Erro ao recarregar {ticker}: {e}")
@@ -893,7 +1051,7 @@ if executar:
     progress = st.progress(0)
     status_text = st.empty()
     
-    
+
     for i, ticker in enumerate(tickers):
         status_text.text(f"🔍 Analisando {ticker} ({i+1}/{len(tickers)})...")
         try:
@@ -901,7 +1059,11 @@ if executar:
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.droplevel(1)
             df = calcular_indicadores(df, dias_breakout, threshold)
-
+            try:
+                df['RS_Rating'] = calcular_rs_rating(df, df_spy)
+            except Exception as e:
+                st.warning(f"⚠️ Erro ao calcular RS Rating para {ticker}: {e}")
+                df['RS_Rating'] = np.nan
             if ordenamento_mm and not (df['EMA20'].iloc[-1] > df['SMA50'].iloc[-1] > df['SMA150'].iloc[-1] > df['SMA200'].iloc[-1]):
                 continue
 
@@ -946,6 +1108,13 @@ if executar:
                     st.markdown(comentario)
                     st.markdown(f"📅 **Resultado:** {earnings_str}")
                     st.markdown(f"📉 **Risco:** `{risco}`")
+
+                    rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns else None
+                    if rs_val is not None and not pd.isna(rs_val):
+                        st.markdown(f"💪 RS Rating (1 a 99): **{int(rs_val)}**")
+                    else:
+                        st.markdown("💪 RS Rating: ❌ Não disponível")
+
 
                     preco = df["Close"].iloc[-1]
                     PP, suportes, resistencias = calcular_pivot_points(df)
@@ -1022,7 +1191,15 @@ if executar:
                 "Risco": risco,
                 "Tendência": tendencia,
                 "Comentário": comentario,
-                "Earnings": earnings_str
+                "Earnings": earnings_str,
+                "RS Rating": int(rs_val) if rs_val is not None and not pd.isna(rs_val) else "N/A",
+                "Dist % SMA20": dist_sma20,
+                "Dist % SMA50": dist_sma50,
+                "Dist % SMA200": dist_sma200,
+                "Dist % Máx52s": dist_max52,
+                "Dist % Mín52s": dist_min52,
+                "Filtros": filtros_aplicados_str_legivel
+
             })
 
         except Exception as e:
@@ -1036,24 +1213,24 @@ if executar:
     progress.empty()
 
     if st.session_state.recomendacoes:
-        st.subheader("📋 Tabela Final de Recomendações")
+        st.subheader("📋 Tabela Final dos Ativos Selecionado")
         df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
         st.dataframe(df_final, use_container_width=True)
         st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
 
 if executar:
     try:
-        # ✅ SANITIZAÇÃO RADICAL DOS TICKERS
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
 
         if not tickers_limpos:
             st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
             st.stop()
 
-        # ✅ Filtros convertidos para string simples
-        filtros_serializaveis = {str(k): str(v) for k, v in filters_dict.items()}
+        def limpar_chave_firebase(s: str) -> str:
+            return re.sub(r'[.$#\[\]/]', '_', s)
 
-        # ✅ Gerar nome curto e seguro para Firebase
+        filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
+
         filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')}|{st.session_state.get('filtro_performance', '')}|{st.session_state.get('filtro_volume', '')}"
         hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
@@ -1062,19 +1239,19 @@ if executar:
         uid = st.session_state.user["localId"]
         busca_ref = db.reference(f"historico_buscas/{uid}/{nome_firebase_safe}")
 
-        # ✅ Payload validado
         payload = {
             "tickers": tickers_limpos,
             "filtros": filtros_serializaveis,
             "nome_exibicao": filtros_aplicados_str
         }
-        json.dumps(payload)  # validação
 
+        json.dumps(payload)  # validação
         busca_ref.set(payload)
         st.success("✅ Histórico salvo com sucesso!")
 
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
+
 
 with st.expander("🕓 Histórico de Buscas"):
     historico_ref = db.reference(f"historico_buscas/{uid}")

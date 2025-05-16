@@ -6,37 +6,44 @@ import re
 from datetime import datetime, date
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
+from streamlit_javascript import st_javascript
 
-st.set_page_config(layout="wide")
-# Verifica se o usuário está autenticado
+
+# Inicializa Firebase Admin se ainda não foi inicializado
+if not firebase_admin._apps:
+    cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": st.secrets["databaseURL"]
+    })
+
+# Tenta restaurar a sessão via cookie se não estiver logado
+if "logged_in" not in st.session_state:
+    cookie_str = st_javascript("document.cookie")
+    token = None
+    if cookie_str:
+        for item in cookie_str.split(";"):
+            if item.strip().startswith("idToken="):
+                token = item.strip().split("=")[1]
+                break
+
+    if token:
+        try:
+            decoded = admin_auth.verify_id_token(token)
+            user_data = {
+                "localId": decoded["uid"],
+                "email": decoded["email"]
+            }
+            st.session_state.logged_in = True
+            st.session_state.user = user_data
+        except Exception:
+            st.warning("⚠️ Sessão inválida ou expirada. Faça login novamente.")
+
+# Bloqueia acesso se ainda não estiver autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
 
-
-
-
-try:
-    key = st.secrets["firebase_admin"]["private_key"]
-    serialization.load_pem_private_key(key.encode(), password=None)
-except Exception as e:
-    st.error(f"❌ Erro na chave privada: {e}")
-    st.stop()
-
-if not firebase_admin._apps:
-    try:
-        cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
-        firebase_admin.initialize_app(cred, {
-            "databaseURL": st.secrets["databaseURL"]
-        })
-    except Exception as e:
-        st.error(f"Erro ao inicializar Firebase: {e}")
-        st.stop()
-
-if "user" not in st.session_state or "localId" not in st.session_state.user:
-    st.error("Usuário não autenticado corretamente.")
-    st.stop()
 
 user_id = st.session_state.user["localId"]
 ref = db.reference(f"carteiras/{user_id}/simulacoes")

@@ -2,6 +2,9 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+from streamlit_javascript import st_javascript
+from firebase_admin import credentials, auth as admin_auth, db
+import firebase_admin
 from Screener.indicators import (
     calcular_indicadores,
     detectar_vcp,
@@ -15,13 +18,44 @@ from Screener.indicators import (
     plot_ativo
 )
 
-st.set_page_config(layout="wide")
 
-# Verifica se o usuário está autenticado
+
+# Inicializa Firebase Admin se ainda não foi inicializado
+if not firebase_admin._apps:
+    cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": st.secrets["databaseURL"]
+    })
+
+# Tenta restaurar a sessão via cookie se não estiver logado
+if "logged_in" not in st.session_state:
+    cookie_str = st_javascript("document.cookie")
+    token = None
+    if cookie_str:
+        for item in cookie_str.split(";"):
+            if item.strip().startswith("idToken="):
+                token = item.strip().split("=")[1]
+                break
+
+    if token:
+        try:
+            decoded = admin_auth.verify_id_token(token)
+            user_data = {
+                "localId": decoded["uid"],
+                "email": decoded["email"]
+            }
+            st.session_state.logged_in = True
+            st.session_state.user = user_data
+        except Exception:
+            st.warning("⚠️ Sessão inválida ou expirada. Faça login novamente.")
+
+# Bloqueia acesso se ainda não estiver autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
+
+
 
 st.title("📌 Análise Individual de Ticker")
 
