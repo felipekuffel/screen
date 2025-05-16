@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-import datetime
+from datetime import datetime, timedelta, timezone
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
@@ -1209,13 +1209,11 @@ if executar:
             return re.sub(r'[.$#\[\]/]', '_', s)
 
         filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
-        agora = datetime.datetime.now()
-        timestamp = agora.strftime("%Y%m%d-%H%M")  # Para o ID único do Firebase
-        data_hora_legivel = agora.strftime("%d/%m %H:%M")  # Para exibição legível
-        filtros_aplicados_str = f"{data_hora_legivel} | {st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
+        agora = datetime.now(timezone(timedelta(hours=-3)))
+        timestamp = agora.strftime("%Y%m%d-%H%M")
+        data_hora_legivel = agora.strftime("%d/%m %H:%M")
+        filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
         hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
-        
-
         nome_firebase_safe = f"{timestamp}_{hash_id}"
 
         uid = st.session_state.user["localId"]
