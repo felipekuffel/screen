@@ -15,6 +15,7 @@ from Screener.indicators import (
     plot_ativo
 )
 
+st.set_page_config(layout="wide")
 
 # Verifica se o usuário está autenticado
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
