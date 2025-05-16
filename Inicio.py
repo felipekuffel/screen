@@ -4,12 +4,35 @@ import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
 from cryptography.hazmat.primitives import serialization
+from streamlit_javascript import st_javascript
 
 
-# --- Configuração da Página ---
-st.set_page_config(
-    page_title="Painel de Análise"
-)
+# --- Tenta restaurar sessão via cookie (idToken salvo em login anterior) ---
+if "logged_in" not in st.session_state:
+    cookie_str = st_javascript("document.cookie")  # lê cookies no navegador
+    token = None
+    if cookie_str:
+        for item in cookie_str.split(";"):
+            if item.strip().startswith("idToken="):
+                token = item.strip().split("=")[1]
+                break
+
+    if token:
+        try:
+            decoded = admin_auth.verify_id_token(token)
+            user_data = {
+                "localId": decoded["uid"],
+                "email": decoded["email"]
+            }
+            st.session_state.logged_in = True
+            st.session_state.user = user_data
+            st.session_state.email = user_data["email"]
+        except Exception as e:
+            st.warning("⚠️ Sessão inválida ou expirada. Faça login novamente.")
+
+
+
+
 st.markdown("""
     <style>
     [data-testid="stSidebar"]::before {
@@ -87,7 +110,6 @@ except Exception as e:
 
 
 
-# --- Funções de Autenticação ---
 def perform_login(email, password):
     try:
         user_creds = auth_pyre.sign_in_with_email_and_password(email, password)
@@ -95,15 +117,25 @@ def perform_login(email, password):
         
         # Armazena informações do usuário na sessão
         st.session_state.user = user_creds
-        st.session_state.email = email # Email fornecido no login
+        st.session_state.email = email
         st.session_state.refresh_token = user_creds["refreshToken"]
         st.session_state.logged_in = True
 
-        # Lógica de Trial para usuários não-admin
+        # Salva o token como cookie por 7 dias
+        st.markdown(
+            f"""
+            <script>
+            document.cookie = "idToken={user_creds['idToken']}; max-age=604800; path=/";
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Lógica de Trial
         if email not in ADMIN_EMAILS:
             trial_ref = db.reference(f"trials/{user_id}")
             trial_info = trial_ref.get()
-            if trial_info is None: # Novo usuário ou sem trial registrado
+            if trial_info is None:
                 expiration_date = (datetime.datetime.utcnow() + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
                 trial_ref.set({"trial_expiration": expiration_date})
                 st.session_state.trial_expiration = expiration_date
@@ -115,24 +147,22 @@ def perform_login(email, password):
                     trial_expiration_date = datetime.datetime.strptime(trial_expiration_str, "%Y-%m-%d")
                     if trial_expiration_date < datetime.datetime.utcnow():
                         st.error("⛔️ Seu período de trial expirou. Contate o suporte.")
-                        # Poderia deslogar aqui ou restringir acesso nas páginas
-                        del st.session_state.logged_in # Força logout se trial expirado no login
-                        return False # Indica falha no login devido a trial expirado
+                        del st.session_state.logged_in
+                        return False
                 except ValueError:
-                     st.warning("⚠️ Data de expiração do trial em formato inválido. Contate o suporte.")
-                     # Considerar criar um novo trial ou bloquear
+                    st.warning("⚠️ Data de expiração inválida no trial. Contate o suporte.")
         else:
-            st.session_state.is_admin = True # Marca como admin
+            st.session_state.is_admin = True
 
-        st.rerun() # Importante para recarregar o app no estado logado
-        return True # Indica sucesso no login
+        st.rerun()
+        return True
+
     except Exception as e:
-        # Tenta extrair mensagens de erro mais amigáveis do Firebase
         error_message = str(e)
         if "EMAIL_NOT_FOUND" in error_message or "INVALID_PASSWORD" in error_message:
             st.error("Email ou senha incorretos.")
         elif "USER_DISABLED" in error_message:
-            st.error("Esta conta de usuário foi desabilitada.")
+            st.error("Esta conta foi desativada.")
         else:
             st.error(f"Erro ao fazer login: {e}")
         return False
@@ -187,6 +217,7 @@ def page_login_registration():
                         st.error("As senhas não coincidem.")
                 else:
                     st.warning("Por favor, preencha todos os campos.")
+    st.markdown("---")
 
 def restore_session():
     if "refresh_token" in st.session_state and "logged_in" not in st.session_state:
@@ -243,6 +274,8 @@ if not restore_session():  # Se não estiver logado
     page_login_registration()
     st.stop()
 
+
+
 # --- Se chegou aqui, o usuário está logado ---
 st.sidebar.success(f"Login como: {st.session_state.get('email', 'N/A')}")
 st.sidebar.markdown("---")
@@ -261,3 +294,9 @@ if st.sidebar.button("🚪 Sair", use_container_width=True):
         del st.session_state[key]
     st.info(f"{user_email_on_logout} saiu com sucesso.")
     st.rerun() # Recarrega para voltar à tela de login
+    # Limpa o cookie do token
+    st.markdown("""
+        <script>
+        document.cookie = "idToken=; max-age=0; path=/";
+        </script>
+    """, unsafe_allow_html=True)
