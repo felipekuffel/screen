@@ -1200,39 +1200,39 @@ if executar:
     st.dataframe(df_final, use_container_width=True)
     st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
 
-   if executar and st.session_state.recomendacoes:
-    try:
-        tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
-
-        if not tickers_limpos:
-            st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
-            st.stop()
-
-        def limpar_chave_firebase(s: str) -> str:
-            return re.sub(r'[.$#\[\]/]', '_', s)
-
-        filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
+    if executar and st.session_state.recomendacoes:
+        try:
+            tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
         
-        filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
-        hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
-        agora = datetime.now(timezone(timedelta(hours=-3)))
-        timestamp = agora.strftime("%Y%m%d-%H%M")
-        nome_firebase_safe = f"{timestamp}_{hash_id}"
-
-        uid = st.session_state.user["localId"]
-        busca_ref = db.reference(f"historico_buscas/{uid}/{nome_firebase_safe}")
-
-        payload = {
-            "tickers": tickers_limpos,
-            "filtros": filtros_serializaveis,
-            "nome_exibicao": filtros_aplicados_str
-        }
-
-        json.dumps(payload)  # validação
-        busca_ref.set(payload)
-        st.success("✅ Histórico salvo com sucesso!")
-    except Exception as e:
-        st.error(f"❌ Erro ao salvar histórico: {e}")
+            if not tickers_limpos:
+                st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
+                st.stop()
+        
+            def limpar_chave_firebase(s: str) -> str:
+                return re.sub(r'[.$#\[\]/]', '_', s)
+        
+            filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
+            
+            filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
+            hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
+            agora = datetime.now(timezone(timedelta(hours=-3)))
+            timestamp = agora.strftime("%Y%m%d-%H%M")
+            nome_firebase_safe = f"{timestamp}_{hash_id}"
+        
+            uid = st.session_state.user["localId"]
+            busca_ref = db.reference(f"historico_buscas/{uid}/{nome_firebase_safe}")
+        
+            payload = {
+                "tickers": tickers_limpos,
+                "filtros": filtros_serializaveis,
+                "nome_exibicao": filtros_aplicados_str
+            }
+        
+            json.dumps(payload)  # validação
+            busca_ref.set(payload)
+            st.success("✅ Histórico salvo com sucesso!")
+        except Exception as e:
+            st.error(f"❌ Erro ao salvar histórico: {e}")
 
 
 
