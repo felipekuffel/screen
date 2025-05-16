@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
