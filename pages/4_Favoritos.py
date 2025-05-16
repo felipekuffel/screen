@@ -2,10 +2,9 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta, date
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-
+from streamlit_javascript import st_javascript
+from firebase_admin import credentials, auth as admin_auth, db
+import firebase_admin
 from Screener.indicators import (
     calcular_indicadores,
     detectar_vcp,
@@ -16,13 +15,10 @@ from Screener.indicators import (
     calcular_pivot_points,
     get_quarterly_growth_table_yfinance,
     highlight_niveis,
-    plot_ativo,
-    calcular_rs_rating,
-    inserir_preco_no_meio
+    plot_ativo
 )
 
-import firebase_admin
-from firebase_admin import db
+
 
 # Inicializa Firebase Admin se ainda não foi feito
 if not firebase_admin._apps:
