@@ -864,6 +864,13 @@ if "recarregar_tickers" in st.session_state:
                     else:
                         st.markdown("💪 RS Rating: ❌ Não disponível")
 
+                    preco = df["Close"].iloc[-1]
+
+                    dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
+                    dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
+                    dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
+                    dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
+                    dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
 
 
 
@@ -913,38 +920,7 @@ if "recarregar_tickers" in st.session_state:
                         niveis.append({"Nível": nivel_nome, "Valor": valor})
 
                     df_niveis = inserir_preco_no_meio(niveis, preco)
-                    try:
-                        dist_sma20 = df_niveis.loc["🟣 SMA 20", "Distância"]
-                    except KeyError:
-                        dist_sma20 = "N/A"
-
-                    try:
-                        dist_sma50 = df_niveis.loc["🟣 SMA 50", "Distância"]
-                    except KeyError:
-                        dist_sma50 = "N/A"
-
-                    try:
-                        dist_sma200 = df_niveis.loc["🟣 SMA 200", "Distância"]
-                    except KeyError:
-                        dist_sma200 = "N/A"
-
-                    try:
-                        dist_max52 = df_niveis.loc["📈 Máxima 52s", "Distância"]
-                    except KeyError:
-                        dist_max52 = "N/A"
-
-                    try:
-                        dist_min52 = df_niveis.loc["📉 Mínima 52s", "Distância"]
-                    except KeyError:
-                        dist_min52 = "N/A"
-
-                    if df_resultado is not None:
-                        st.markdown("📊 **Histórico Trimestral (YoY)**")
-                        st.table(df_resultado)
-                    else:
-                        st.warning("❌ Histórico de crescimento YoY não disponível.")
                     
-
                     def highlight_niveis(row):
                         nivel = row.name
                         if "Preço Atual" in nivel:
@@ -973,14 +949,12 @@ if "recarregar_tickers" in st.session_state:
                 "Comentário": comentario,
                 "Earnings": earnings_str,
                 "RS Rating": int(rs_val) if rs_val is not None and not pd.isna(rs_val) else "N/A",
-                "Dist % SMA20": dist_sma20,
-                "Dist % SMA50": dist_sma50,
-                "Dist % SMA200": dist_sma200,
-                "Dist % Máx52s": dist_max52,
-                "Dist % Mín52s": dist_min52,
+                "Dist % SMA20": f"{dist_sma20:+.1f}%",
+                "Dist % SMA50": f"{dist_sma50:+.1f}%",
+                "Dist % SMA200": f"{dist_sma200:+.1f}%",
+                "Dist % Máx52s": f"{dist_max52:+.1f}%",
+                "Dist % Mín52s": f"{dist_min52:+.1f}%",
                 "Filtros": filtros_aplicados_str_legivel
-
-
             })
         except Exception as e:
             st.warning(f"Erro ao recarregar {ticker}: {e}")
@@ -1177,32 +1151,6 @@ if executar:
                     else:
                         st.warning("❌ Histórico de crescimento YoY não disponível.")
 
-                    # ✅ Definir distâncias antes de salvar no resumo
-                    try:
-                        dist_sma20 = df_niveis.loc["🟣 SMA 20", "Distância"]
-                    except KeyError:
-                        dist_sma20 = "N/A"
-
-                    try:
-                        dist_sma50 = df_niveis.loc["🟣 SMA 50", "Distância"]
-                    except KeyError:
-                        dist_sma50 = "N/A"
-
-                    try:
-                        dist_sma200 = df_niveis.loc["🟣 SMA 200", "Distância"]
-                    except KeyError:
-                        dist_sma200 = "N/A"
-
-                    try:
-                        dist_max52 = df_niveis.loc["📈 Máxima 52s", "Distância"]
-                    except KeyError:
-                        dist_max52 = "N/A"
-
-                    try:
-                        dist_min52 = df_niveis.loc["📉 Mínima 52s", "Distância"]
-                    except KeyError:
-                        dist_min52 = "N/A"
-
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
@@ -1211,11 +1159,11 @@ if executar:
                 "Comentário": comentario,
                 "Earnings": earnings_str,
                 "RS Rating": int(rs_val) if rs_val is not None and not pd.isna(rs_val) else "N/A",
-                "Dist % SMA20": dist_sma20,
-                "Dist % SMA50": dist_sma50,
-                "Dist % SMA200": dist_sma200,
-                "Dist % Máx52s": dist_max52,
-                "Dist % Mín52s": dist_min52,
+                "Dist % SMA20": f"{dist_sma20:+.1f}%",
+                "Dist % SMA50": f"{dist_sma50:+.1f}%",
+                "Dist % SMA200": f"{dist_sma200:+.1f}%",
+                "Dist % Máx52s": f"{dist_max52:+.1f}%",
+                "Dist % Mín52s": f"{dist_min52:+.1f}%",
                 "Filtros": filtros_aplicados_str_legivel
             })
 
