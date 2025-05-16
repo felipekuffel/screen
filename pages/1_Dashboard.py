@@ -29,7 +29,6 @@ from streamlit_javascript import st_javascript
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
 import plotly.io as pio
-pio.kaleido.scope.default_format = "jpg"
 
 st.set_page_config(layout="wide")
 
