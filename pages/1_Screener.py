@@ -1190,19 +1190,19 @@ if executar:
     status_text.empty()
     progress.empty()
 
-    if st.session_state.recomendacoes:
-        st.subheader("📋 Tabela Final dos Ativos Selecionado")
-        df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
-        st.dataframe(df_final, use_container_width=True)
-        st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
+      # Após a análise e preenchimento de st.session_state.recomendacoes
+    if not st.session_state.recomendacoes:
+        st.warning("⚠️ Nenhum ativo foi selecionado. Ajuste seus filtros e tente novamente.")
+        st.stop()
 
-if executar:
+    st.subheader("📋 Tabela Final dos Ativos Selecionados")
+    df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
+    st.dataframe(df_final, use_container_width=True)
+    st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
+
+    # 🔄 Salvamento do histórico
     try:
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
-
-        if not tickers_limpos:
-            st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
-            st.stop()
 
         def limpar_chave_firebase(s: str) -> str:
             return re.sub(r'[.$#\[\]/]', '_', s)
@@ -1213,7 +1213,6 @@ if executar:
         hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
         agora = datetime.now(timezone(timedelta(hours=-3)))
         timestamp = agora.strftime("%Y%m%d-%H%M")
-        data_hora_legivel = agora.strftime("%d/%m %H:%M")
         nome_firebase_safe = f"{timestamp}_{hash_id}"
 
         uid = st.session_state.user["localId"]
@@ -1228,7 +1227,6 @@ if executar:
         json.dumps(payload)  # validação
         busca_ref.set(payload)
         st.success("✅ Histórico salvo com sucesso!")
-
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
 
