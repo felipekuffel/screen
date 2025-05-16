@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, date
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from screener.indicators import (
+from Screener.indicators import (
     calcular_indicadores,
     detectar_vcp,
     avaliar_risco,
