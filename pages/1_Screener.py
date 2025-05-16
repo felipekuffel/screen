@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-from datetime import datetime, timedelta, timezone, date
+import datetime
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
@@ -120,7 +120,7 @@ def get_earnings_info_detalhado(ticker):
             # Se for uma lista de datas, pegamos a primeira futura
             if isinstance(earnings, list) and earnings:
                 earnings = earnings[0]
-            if isinstance(earnings, (pd.Timestamp, datetime, date)):
+            if isinstance(earnings, (pd.Timestamp, datetime.datetime, datetime.date)):
                 earnings_date = pd.to_datetime(earnings).tz_localize("America/New_York") if pd.to_datetime(earnings).tzinfo is None else pd.to_datetime(earnings)
                 now = pd.Timestamp.now(tz="America/New_York")
                 delta = (earnings_date - now).days
@@ -943,13 +943,7 @@ if "recarregar_tickers" in st.session_state:
                     df_resultado = get_quarterly_growth_table_yfinance(ticker)
                     
                     
-                    preco = df["Close"].iloc[-1]
-    
-                    dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
-                    dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
-                    dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
-                    dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
-                    dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
+
 
 
             st.session_state.recomendacoes.append({
@@ -1163,15 +1157,6 @@ if st.session_state.get("executar_busca", False):
                     else:
                         st.warning("❌ Histórico de crescimento YoY não disponível.")
 
-
-            preco = df["Close"].iloc[-1]
-
-            dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
-            dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
-            dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
-            dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
-            dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
-            
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
@@ -1205,7 +1190,7 @@ if st.session_state.get("executar_busca", False):
     st.session_state.executar_busca = False  # reset ao final
 
 if st.session_state.get("executar_busca", False):
-     try:
+    try:
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
 
         if not tickers_limpos:
@@ -1237,7 +1222,6 @@ if st.session_state.get("executar_busca", False):
 
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
-
     
     st.session_state.executar_busca = False  # reset ao final
 
