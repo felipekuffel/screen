@@ -9,3 +9,4 @@ pyrebase4
 cryptography
 streamlit-autorefresh
 setuptools
+streamlit_javascript
