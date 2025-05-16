@@ -726,8 +726,11 @@ with st.expander("Expandir/Minimizar Filtros", expanded=True):
         sma200_crescente = st.checkbox("📈 SMA200 maior que há 30 dias", value=st.session_state.get("sma200_crescente", False), key="sma200_crescente")
         mostrar_vcp = st.checkbox("🔍 Mostrar apenas ativos com padrão VCP", value=st.session_state.get("mostrar_vcp", False), key="mostrar_vcp")
 
-    executar = st.button("🔎 Iniciar Busca", type="primary")
+    if "executar_busca" not in st.session_state:
+        st.session_state.executar_busca = False
 
+    if st.button("🔎 Iniciar Busca", type="primary"):
+        st.session_state.executar_busca = True
 # REMOVED: The generic rerun_filtros logic. Reruns are handled by actions directly.
 # if st.session_state.get("rerun_filtros", False):
 # st.session_state["rerun_filtros"] = False
@@ -991,7 +994,7 @@ if "recarregar_tickers" in st.session_state:
 
 
 
-if executar:
+if st.session_state.get("executar_busca", False):
     st.session_state.recomendacoes = []
 
     status_text = st.empty()
@@ -1195,8 +1198,10 @@ if executar:
         df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
         st.dataframe(df_final, use_container_width=True)
         st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
+st.session_state.executar_busca = False
 
-if executar:
+
+if st.session_state.get("executar_busca", False):
     try:
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
 
@@ -1230,6 +1235,7 @@ if executar:
 
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
+st.session_state.executar_busca = False
 
 
 with st.expander("🕓 Histórico de Buscas"):
