@@ -4,6 +4,94 @@ import numpy as np
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import datetime
+from streamlit_javascript import st_javascript
+import streamlit as st
+import firebase_admin
+
+
+# Inicializa Firebase Admin se ainda não foi inicializado
+if not firebase_admin._apps:
+    cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": st.secrets["databaseURL"]
+    })
+
+# Tenta restaurar a sessão via cookie se não estiver logado
+if "logged_in" not in st.session_state:
+    cookie_str = st_javascript("document.cookie")
+    token = None
+    if cookie_str:
+        for item in cookie_str.split(";"):
+            if item.strip().startswith("idToken="):
+                token = item.strip().split("=")[1]
+                break
+
+    if token:
+        try:
+            decoded = admin_auth.verify_id_token(token)
+            user_data = {
+                "localId": decoded["uid"],
+                "email": decoded["email"]
+            }
+            st.session_state.logged_in = True
+            st.session_state.user = user_data
+        except Exception:
+            st.warning("⚠️ Sessão inválida ou expirada. Faça login novamente.")
+
+# Bloqueia acesso se ainda não estiver autenticado
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
+    st.link_button("🔐 Ir para Login", "/")
+    st.stop()
+
+def calcular_rs_rating(df_ativo, df_bench):
+    df_ativo = df_ativo.sort_index().copy()
+    df_bench = df_bench.sort_index().copy()
+
+    def calc_perf(df, dias):
+        if len(df) > dias:
+            return df['Close'].iloc[-1] / df['Close'].iloc[-dias]
+        else:
+            return np.nan
+
+    perf_ativo = {
+        "63": calc_perf(df_ativo, 63),
+        "126": calc_perf(df_ativo, 126),
+        "189": calc_perf(df_ativo, 189),
+        "252": calc_perf(df_ativo, 252),
+    }
+
+    perf_bench = {
+        "63": calc_perf(df_bench, 63),
+        "126": calc_perf(df_bench, 126),
+        "189": calc_perf(df_bench, 189),
+        "252": calc_perf(df_bench, 252),
+    }
+
+    if any(np.isnan(list(perf_ativo.values()))) or any(np.isnan(list(perf_bench.values()))):
+        return None
+
+    rs_stock = 0.4 * perf_ativo["63"] + 0.2 * perf_ativo["126"] + 0.2 * perf_ativo["189"] + 0.2 * perf_ativo["252"]
+    rs_ref = 0.4 * perf_bench["63"] + 0.2 * perf_bench["126"] + 0.2 * perf_bench["189"] + 0.2 * perf_bench["252"]
+    total_rs_score = (rs_stock / rs_ref) * 100
+
+    thresholds = [
+        (195.93, 99),
+        (117.11, 90),
+        (99.04, 70),
+        (91.66, 50),
+        (80.96, 30),
+        (53.64, 10),
+        (24.86, 1),
+    ]
+
+    for i in range(len(thresholds) - 1):
+        upper, rating_upper = thresholds[i]
+        lower, rating_lower = thresholds[i + 1]
+        if lower <= total_rs_score < upper:
+            return round(rating_lower + (rating_upper - rating_lower) * (total_rs_score - lower) / (upper - lower))
+
+    return 99 if total_rs_score >= thresholds[0][0] else 1
 
 
 def get_earnings_info_detalhado(ticker):
