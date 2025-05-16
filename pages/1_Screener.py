@@ -945,7 +945,13 @@ if "recarregar_tickers" in st.session_state:
                     
 
 
+                    preco = df["Close"].iloc[-1]
 
+                    dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
+                    dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
+                    dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
+                    dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
+                    dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
@@ -1156,7 +1162,13 @@ if st.session_state.get("executar_busca", False):
                         st.table(df_resultado)
                     else:
                         st.warning("❌ Histórico de crescimento YoY não disponível.")
+                    preco = df["Close"].iloc[-1]
 
+                    dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
+                    dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
+                    dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
+                    dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
+                    dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
