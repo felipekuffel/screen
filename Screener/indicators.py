@@ -43,7 +43,26 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Você precisa estar logado para acessar esta página.")
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
-
+def calcular_indicadores(df, length=20, momentum_threshold=0.07):
+    df = df.dropna(subset=['Open', 'High', 'Low', 'Close'])
+    df = df[(df['High'] > df['Low']) & (df['Open'] != df['Close'])]
+    df['High20'] = df['High'].rolling(length).max().shift(1)
+    df['Low20'] = df['Low'].rolling(length).min()
+    df['SMA20'] = df['Close'].rolling(20).mean()
+    df['SMA50'] = df['Close'].rolling(50).mean()
+    df['SMA150'] = df['Close'].rolling(150).mean()
+    df['SMA200'] = df['Close'].rolling(200).mean()
+    df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
+    centro = ((df['High20'] + df['Low20']) / 2 + df['Close'].rolling(length).mean()) / 2
+    df['linreg_close'] = df['Close'].rolling(length).apply(
+        lambda x: np.polyfit(np.arange(length), x, 1)[1] + np.polyfit(np.arange(length), x, 1)[0] * (length - 1),
+        raw=True
+    )
+    df['momentum'] = df['linreg_close'] - centro
+    df['momentum_up'] = (df['momentum'].shift(1) <= 0) & (df['momentum'] > momentum_threshold)
+    df['rompe_resistencia'] = df['Close'] > df['High20']
+    df['suporte'] = df['Low'].rolling(length).min()
+    return df
 def calcular_rs_rating(df_ativo, df_bench):
     df_ativo = df_ativo.sort_index().copy()
     df_bench = df_bench.sort_index().copy()
