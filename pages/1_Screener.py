@@ -1205,17 +1205,21 @@ if st.session_state.get("executar_busca", False):
     st.session_state.executar_busca = False  # reset ao final
 
 if st.session_state.get("executar_busca", False):
-    try:
+     try:
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
+
+        if not tickers_limpos:
+            st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
+            st.stop()
 
         def limpar_chave_firebase(s: str) -> str:
             return re.sub(r'[.$#\[\]/]', '_', s)
 
         filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
-        agora = datetime.now(timezone(timedelta(hours=-3)))
-        timestamp = agora.strftime("%Y%m%d-%H%M")
-        filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
+
+        filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')}|{st.session_state.get('filtro_performance', '')}|{st.session_state.get('filtro_volume', '')}"
         hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
         nome_firebase_safe = f"{timestamp}_{hash_id}"
 
         uid = st.session_state.user["localId"]
@@ -1230,8 +1234,10 @@ if st.session_state.get("executar_busca", False):
         json.dumps(payload)  # validação
         busca_ref.set(payload)
         st.success("✅ Histórico salvo com sucesso!")
+
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
+
     
     st.session_state.executar_busca = False  # reset ao final
 
