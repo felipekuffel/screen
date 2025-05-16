@@ -1205,7 +1205,7 @@ if st.session_state.get("executar_busca", False):
     st.session_state.executar_busca = False  # reset ao final
 
 if st.session_state.get("executar_busca", False):
-     try:
+    try:
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
 
         if not tickers_limpos:
@@ -1237,7 +1237,6 @@ if st.session_state.get("executar_busca", False):
 
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
-
     
     st.session_state.executar_busca = False  # reset ao final
 
