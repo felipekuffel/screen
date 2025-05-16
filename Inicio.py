@@ -6,10 +6,16 @@ from firebase_admin import credentials, auth as admin_auth, db
 from cryptography.hazmat.primitives import serialization
 from streamlit_javascript import st_javascript
 
+# Inicializa Firebase Admin se ainda não foi inicializado
+if not firebase_admin._apps:
+    cred = credentials.Certificate(dict(st.secrets["firebase_admin"]))
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": st.secrets["databaseURL"]
+    })
 
-# --- Tenta restaurar sessão via cookie (idToken salvo em login anterior) ---
+# Tenta restaurar a sessão via cookie se não estiver logado
 if "logged_in" not in st.session_state:
-    cookie_str = st_javascript("document.cookie")  # lê cookies no navegador
+    cookie_str = st_javascript("document.cookie")
     token = None
     if cookie_str:
         for item in cookie_str.split(";"):
@@ -26,10 +32,14 @@ if "logged_in" not in st.session_state:
             }
             st.session_state.logged_in = True
             st.session_state.user = user_data
-            st.session_state.email = user_data["email"]
-        except Exception as e:
+        except Exception:
             st.warning("⚠️ Sessão inválida ou expirada. Faça login novamente.")
 
+# Bloqueia acesso se ainda não estiver autenticado
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.warning("⚠️ Você precisa estar logado para acessar esta página.")
+    st.link_button("🔐 Ir para Login", "/")
+    st.stop()
 
 
 
