@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-from datetime import timedelta, timezone
+from datetime import timedelta, timezone, datetime
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
@@ -28,7 +28,6 @@ import json
 from streamlit_javascript import st_javascript
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
-import datetime
 st.set_page_config(layout="wide")
 
 # Inicializa Firebase Admin se ainda não foi inicializado
@@ -120,7 +119,7 @@ def get_earnings_info_detalhado(ticker):
             # Se for uma lista de datas, pegamos a primeira futura
             if isinstance(earnings, list) and earnings:
                 earnings = earnings[0]
-            if isinstance(earnings, (pd.Timestamp, datetime.datetime, datetime.date)):
+            if isinstance(earnings, (pd.Timestamp, datetime, datetime.date)):
                 earnings_date = pd.to_datetime(earnings).tz_localize("America/New_York") if pd.to_datetime(earnings).tzinfo is None else pd.to_datetime(earnings)
                 now = pd.Timestamp.now(tz="America/New_York")
                 delta = (earnings_date - now).days
