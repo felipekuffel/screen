@@ -938,6 +938,12 @@ if "recarregar_tickers" in st.session_state:
                     df_resultado = get_quarterly_growth_table_yfinance(ticker)
                     
                     
+            preco = df["Close"].iloc[-1]
+            dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
+            dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
+            dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
+            dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
+            dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
 
 
 
