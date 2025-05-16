@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-import datetime
+from datetime import datetime, timedelta, timezone, date
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
@@ -28,7 +28,6 @@ import json
 from streamlit_javascript import st_javascript
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
-
 st.set_page_config(layout="wide")
 
 # Inicializa Firebase Admin se ainda não foi inicializado
@@ -120,7 +119,7 @@ def get_earnings_info_detalhado(ticker):
             # Se for uma lista de datas, pegamos a primeira futura
             if isinstance(earnings, list) and earnings:
                 earnings = earnings[0]
-            if isinstance(earnings, (pd.Timestamp, datetime.datetime, datetime.date)):
+            if isinstance(earnings, (pd.Timestamp, datetime, date)):
                 earnings_date = pd.to_datetime(earnings).tz_localize("America/New_York") if pd.to_datetime(earnings).tzinfo is None else pd.to_datetime(earnings)
                 now = pd.Timestamp.now(tz="America/New_York")
                 delta = (earnings_date - now).days
@@ -727,12 +726,7 @@ with st.expander("Expandir/Minimizar Filtros", expanded=True):
         sma200_crescente = st.checkbox("📈 SMA200 maior que há 30 dias", value=st.session_state.get("sma200_crescente", False), key="sma200_crescente")
         mostrar_vcp = st.checkbox("🔍 Mostrar apenas ativos com padrão VCP", value=st.session_state.get("mostrar_vcp", False), key="mostrar_vcp")
 
-        
-    if "executar_busca" not in st.session_state:
-        st.session_state.executar_busca = False
-    
-    if st.button("🔎 Iniciar Busca", type="primary"):
-        st.session_state.executar_busca = True
+    executar = st.button("🔎 Iniciar Busca", type="primary")
 
 # REMOVED: The generic rerun_filtros logic. Reruns are handled by actions directly.
 # if st.session_state.get("rerun_filtros", False):
@@ -943,15 +937,15 @@ if "recarregar_tickers" in st.session_state:
                     df_resultado = get_quarterly_growth_table_yfinance(ticker)
                     
                     
+            preco = df["Close"].iloc[-1]
+            dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
+            dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
+            dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
+            dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
+            dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
 
 
-                    preco = df["Close"].iloc[-1]
 
-                    dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
-                    dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
-                    dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
-                    dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
-                    dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
@@ -997,8 +991,7 @@ if "recarregar_tickers" in st.session_state:
 
 
 
-if st.session_state.get("executar_busca", False):
-
+if executar:
     st.session_state.recomendacoes = []
 
     status_text = st.empty()
@@ -1162,13 +1155,17 @@ if st.session_state.get("executar_busca", False):
                         st.table(df_resultado)
                     else:
                         st.warning("❌ Histórico de crescimento YoY não disponível.")
-                    preco = df["Close"].iloc[-1]
 
-                    dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
-                    dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
-                    dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
-                    dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
-                    dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
+
+
+
+            preco = df["Close"].iloc[-1]
+            dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
+            dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
+            dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
+            dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
+            dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
+
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
@@ -1198,50 +1195,41 @@ if st.session_state.get("executar_busca", False):
         df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
         st.dataframe(df_final, use_container_width=True)
         st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
-    
-    st.session_state.executar_busca = False  # reset ao final
 
-if st.session_state.get("executar_busca", False):
-    if st.session_state.recomendacoes:
-        st.subheader("📋 Tabela Final dos Ativos Selecionados")
-        df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
-        st.dataframe(df_final, use_container_width=True)
-        st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
+if executar:
+    try:
+        tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
 
-        # Salvamento do histórico (mover para aqui)
-        try:
-            tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
+        if not tickers_limpos:
+            st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
+            st.stop()
 
-            if not tickers_limpos:
-                st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
-            else:
-                def limpar_chave_firebase(s: str) -> str:
-                    return re.sub(r'[.$#\[\]/]', '_', s)
+        def limpar_chave_firebase(s: str) -> str:
+            return re.sub(r'[.$#\[\]/]', '_', s)
 
-                filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
+        filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
+        agora = datetime.now(timezone(timedelta(hours=-3)))
+        timestamp = agora.strftime("%Y%m%d-%H%M")
+        data_hora_legivel = agora.strftime("%d/%m %H:%M")
+        filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
+        hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
+        nome_firebase_safe = f"{timestamp}_{hash_id}"
 
-                filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')}|{st.session_state.get('filtro_performance', '')}|{st.session_state.get('filtro_volume', '')}"
-                hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
-                timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
-                nome_firebase_safe = f"{timestamp}_{hash_id}"
+        uid = st.session_state.user["localId"]
+        busca_ref = db.reference(f"historico_buscas/{uid}/{nome_firebase_safe}")
 
-                uid = st.session_state.user["localId"]
-                busca_ref = db.reference(f"historico_buscas/{uid}/{nome_firebase_safe}")
+        payload = {
+            "tickers": tickers_limpos,
+            "filtros": filtros_serializaveis,
+            "nome_exibicao": filtros_aplicados_str
+        }
 
-                payload = {
-                    "tickers": tickers_limpos,
-                    "filtros": filtros_serializaveis,
-                    "nome_exibicao": filtros_aplicados_str
-                }
+        json.dumps(payload)  # validação
+        busca_ref.set(payload)
+        st.success("✅ Histórico salvo com sucesso!")
 
-                json.dumps(payload)  # validação
-                busca_ref.set(payload)
-                st.success("✅ Histórico salvo com sucesso!")
-        except Exception as e:
-            st.error(f"❌ Erro ao salvar histórico: {e}")
-
-    st.session_state.executar_busca = False  # Reset no final
-
+    except Exception as e:
+        st.error(f"❌ Erro ao salvar histórico: {e}")
 
 
 with st.expander("🕓 Histórico de Buscas"):
