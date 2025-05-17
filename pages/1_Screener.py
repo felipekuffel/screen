@@ -1222,7 +1222,7 @@ if executar:
             return re.sub(r'[.$#\[\]/]', '_', s)
 
         filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
-        agora = datetime.datetimenow(datetime.timezone(datetime.timedelta(hours=-3)))
+        agora = pd.Timestamp.now(tz="America/Sao_Paulo")
         timestamp = agora.strftime("%Y%m%d-%H%M")
         data_hora_legivel = agora.strftime("%d/%m %H:%M")
         filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
