@@ -1198,23 +1198,23 @@ if executar:
     progress.empty()
     
     if st.session_state.get("favoritos_selecionados"):
-    st.markdown("### ⭐ Adicionar selecionados aos Favoritos")
-
-    if st.button("✅ Confirmar favoritos selecionados"):
-        uid = st.session_state.user["localId"]
-        agora = datetime.datetime.now().isoformat()
-
-        for ticker in st.session_state.favoritos_selecionados:
-            try:
-                nome = yf.Ticker(ticker).info.get("shortName", ticker)
-                db.reference(f"favoritos/{uid}/{ticker}").set({
-                    "ticker": ticker,
-                    "nome": nome,
-                    "comentario": "",  # Você pode personalizar por ticker depois se quiser
-                    "adicionado_em": agora
-                })
-            except Exception as e:
-                st.warning(f"Erro ao adicionar {ticker}: {e}")
+        st.markdown("### ⭐ Adicionar selecionados aos Favoritos")
+    
+        if st.button("✅ Confirmar favoritos selecionados"):
+            uid = st.session_state.user["localId"]
+            agora = datetime.datetime.now().isoformat()
+    
+            for ticker in st.session_state.favoritos_selecionados:
+                try:
+                    nome = yf.Ticker(ticker).info.get("shortName", ticker)
+                    db.reference(f"favoritos/{uid}/{ticker}").set({
+                        "ticker": ticker,
+                        "nome": nome,
+                        "comentario": "",  # Você pode personalizar por ticker depois se quiser
+                        "adicionado_em": agora
+                    })
+                except Exception as e:
+                    st.warning(f"Erro ao adicionar {ticker}: {e}")
 
         st.success("✅ Favoritos adicionados com sucesso!")
         st.session_state.favoritos_selecionados.clear()
