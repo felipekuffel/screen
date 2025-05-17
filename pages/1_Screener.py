@@ -1092,31 +1092,24 @@ if executar:
                     st.subheader(f"{ticker} - {nome}")
                 # Botão de Favoritar sem loop/rerun
                 with col2:
-                    comentario_key = f"coment_{ticker}"
-                    if comentario_key not in st.session_state:
-                        st.session_state[comentario_key] = ""
-                    comentario_personalizado = st.text_input("📝 Comentário (opcional)", value=st.session_state[comentario_key], key=comentario_key)
+                    with st.form(f"form_fav_{ticker}", clear_on_submit=False):
+                        comentario_key = f"coment_{ticker}"
+                        comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state.get(comentario_key, ""), key=comentario_key)
                 
-                    salvar_key = f"salvo_{ticker}"
-                    if f"botao_{ticker}" not in st.session_state:
-                        st.session_state[f"botao_{ticker}"] = False
-                
-                    if st.button(f"⭐ Adicionar aos Favoritos {ticker}", key=f"fav_btn_{ticker}"):
-                        try:
-                            uid = st.session_state.user["localId"]
-                            fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
-                            fav_ref.set({
-                                "ticker": ticker,
-                                "nome": nome,
-                                "comentario": st.session_state[comentario_key],
-                                "adicionado_em": datetime.datetime.now().isoformat()
-                            })
-                            st.session_state[f"botao_{ticker}"] = True
-                        except Exception as e:
-                            st.error(f"Erro ao salvar favorito: {e}")
-                
-                    if st.session_state.get(f"botao_{ticker}", False):
-                        st.success(f"✅ {ticker} adicionado aos favoritos!")
+                        submitted = st.form_submit_button(f"⭐ Adicionar aos Favoritos {ticker}")
+                        if submitted:
+                            try:
+                                uid = st.session_state.user["localId"]
+                                fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
+                                fav_ref.set({
+                                    "ticker": ticker,
+                                    "nome": nome,
+                                    "comentario": comentario,
+                                    "adicionado_em": datetime.datetime.now().isoformat()
+                                })
+                                st.success(f"✅ {ticker} adicionado aos favoritos!")
+                            except Exception as e:
+                                st.error(f"Erro ao salvar favorito: {e}")
                 col1, col2 = st.columns([3, 2])
 
                 with col1:
