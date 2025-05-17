@@ -1065,14 +1065,11 @@ if executar:
             with st.container():
                 st.subheader(f"{ticker} - {nome}")
                 col1, col2 = st.columns([3, 2])
-            
+
                 with col1:
                     with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
                         fig = plot_ativo(df, ticker, nome, vcp_detectado)
                         st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}")
-            
-                with col2:
-                    # Checkbox para seleção
                     marcado = st.checkbox(f"⭐ Marcar {ticker} para favoritos", key=f"chk_{ticker}")
                     if "favoritos_selecionados" not in st.session_state:
                         st.session_state.favoritos_selecionados = set()
@@ -1081,12 +1078,6 @@ if executar:
                         st.session_state.favoritos_selecionados.add(ticker)
                     else:
                         st.session_state.favoritos_selecionados.discard(ticker)
-                col1, col2 = st.columns([3, 2])
-
-                with col1:
-                    with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
-                        fig = plot_ativo(df, ticker, nome, vcp_detectado)
-                        st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}")
 
                 with col2:
                     st.markdown(comentario)
