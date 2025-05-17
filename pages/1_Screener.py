@@ -1265,7 +1265,8 @@ if executar:
 
 
 with st.expander("🕓 Histórico de Buscas"):
-    historico_ref = db.reference(f"historico_buscas/{uid}")
+uid = st.session_state.user["localId"]
+historico_ref = db.reference(f"historico_buscas/{uid}")
     historico = historico_ref.get()
 
     if historico:
