@@ -1077,19 +1077,22 @@ if executar:
                     st.subheader(f"{ticker} - {nome}")
                 # Botão de Favoritar sem loop/rerun
                 with col2: 
-                    with st.form(key=f"form_fav_{ticker}"):
-                        comentario_personalizado = st.text_input("📝 Comentário (opcional)", key=f"coment_{ticker}")
-                        submit_fav = st.form_submit_button(f"⭐ Adicionar aos Favoritos {ticker}")
-                        if submit_fav:
+                    comentario_key = f"coment_{ticker}"
+                    comentario_personalizado = st.text_input("📝 Comentário (opcional)", key=comentario_key)
+                    
+                    if st.button(f"⭐ Adicionar aos Favoritos {ticker}", key=f"fav_btn_{ticker}"):
+                        try:
                             uid = st.session_state.user["localId"]
                             fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
                             fav_ref.set({
                                 "ticker": ticker,
                                 "nome": nome,
-                                "comentario": comentario_personalizado,
-                                "adicionado_em": datetime.now().isoformat()
+                                "comentario": st.session_state[comentario_key],
+                                "adicionado_em": datetime.datetime.now().isoformat()
                             })
                             st.success(f"✅ {ticker} adicionado aos favoritos!")
+        except Exception as e:
+            st.error(f"Erro ao salvar favorito: {e}")
                 col1, col2 = st.columns([3, 2])
 
                 with col1:
