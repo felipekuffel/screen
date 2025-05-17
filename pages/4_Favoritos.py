@@ -2,7 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 from firebase_admin import db
-from Screener.indicators import (
+from Screener.fav import (
     calcular_indicadores,
     calcular_rs_rating,
     get_earnings_info_detalhado,
