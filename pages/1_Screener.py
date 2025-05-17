@@ -457,58 +457,9 @@ def classificar_tendencia(close):
         return "Lateral"
 
 
-# --- Nova função de risco aprimorada ---
-def avaliar_risco(df):
-    preco_atual = df['Close'].iloc[-1]
-    suporte = df['Low'].rolling(20).min().iloc[-1]
-    resistencia = df['High'].rolling(20).max().iloc[-1]
-    risco = 5  # ponto base
-
-    # ATR (volatilidade)
-    df['TR'] = np.maximum(df['High'] - df['Low'], np.maximum(abs(df['High'] - df['Close'].shift(1)), abs(df['Low'] - df['Close'].shift(1))))
-    atr = df['TR'].rolling(14).mean().iloc[-1]
-    if atr / preco_atual > 0.05:
-        risco += 1  # ativo volátil
-    else:
-        risco -= 1  # ativo estável
-
-    # Distância até suporte
-    if (preco_atual - suporte) / preco_atual > 0.05:
-        risco += 1
-
-    # Proximidade da resistência
-    if (resistencia - preco_atual) / preco_atual < 0.03:
-        risco += 1
-
-    # Preço abaixo da média de 200
-    if preco_atual < df['SMA200'].iloc[-1]:
-        risco += 1
-
-    # Quedas consecutivas nos últimos 30 dias
-    closes = df['Close'].tail(30).reset_index(drop=True)
-    quedas = sum(closes.diff() < 0)
-    if quedas >= 3:
-        risco += 1
-
-    # Queda com volume alto nos últimos 30 dias
-    recent_df = df.tail(30)
-    media_volume = recent_df['Volume'].mean()
-    dias_queda_volume_alto = recent_df[(recent_df['Close'] < recent_df['Close'].shift(1)) & (recent_df['Volume'] > media_volume)]
-    if not dias_queda_volume_alto.empty:
-        risco += 1
-
-    # Rompimento de topo com volume alto
-    if df['rompe_resistencia'].iloc[-1] and df['Volume'].iloc[-1] > df['Volume'].rolling(20).mean().iloc[-1]:
-        risco -= 1
-
-    # Médias alinhadas
-    if df['EMA20'].iloc[-1] > df['SMA50'].iloc[-1] > df['SMA150'].iloc[-1] > df['SMA200'].iloc[-1]:
-        risco -= 1
-
-    return int(min(max(round(risco), 1), 10))
 
 # --- Função de análise IA aprimorada ---
-def gerar_comentario(df, risco, tendencia, vcp):
+def gerar_comentario(df,tendencia, vcp):
     comentario = "📊 Ativo em zona de observação técnica"
 
     sinais = []
@@ -843,9 +794,8 @@ if "recarregar_tickers" in st.session_state:
 
             vcp_detectado = detectar_vcp(df)
             nome = yf.Ticker(ticker).info.get("shortName", ticker)
-            risco = avaliar_risco(df)
             tendencia = classificar_tendencia(df['Close'].tail(20))
-            comentario = gerar_comentario(df, risco, tendencia, vcp_detectado)
+            comentario = gerar_comentario(df,tendencia, vcp_detectado)
             earnings_str, _, _ = get_earnings_info_detalhado(ticker)
 
             with st.container():
@@ -860,7 +810,6 @@ if "recarregar_tickers" in st.session_state:
                 with col2:
                     st.markdown(comentario)
                     st.markdown(f"📅 **Resultado:** {earnings_str}")
-                    st.markdown(f"📉 Risco (1 a 10): **{risco}**")
 
                     rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns else None
                     if rs_val is not None and not pd.isna(rs_val):
@@ -954,7 +903,6 @@ if "recarregar_tickers" in st.session_state:
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
-                "Risco": risco,
                 "Tendência": tendencia,
                 "Comentário": comentario,
                 "Earnings": earnings_str,
@@ -1071,7 +1019,7 @@ if st.session_state.get("executar_busca", False):
 
             
             tendencia = classificar_tendencia(df['Close'].tail(20))
-            comentario = gerar_comentario(df, risco, tendencia, vcp_detectado)
+            comentario = gerar_comentario(df, tendencia, vcp_detectado)
             earnings_str, _, _ = get_earnings_info_detalhado(ticker)
 
             with st.container():
@@ -1086,7 +1034,6 @@ if st.session_state.get("executar_busca", False):
                 with col2:
                     st.markdown(comentario)
                     st.markdown(f"📅 **Resultado:** {earnings_str}")
-                    st.markdown(f"📉 **Risco:** `{risco}`")
 
                     rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns else None
                     if rs_val is not None and not pd.isna(rs_val):
@@ -1176,7 +1123,6 @@ if st.session_state.get("executar_busca", False):
             st.session_state.recomendacoes.append({
                 "Ticker": ticker,
                 "Empresa": nome,
-                "Risco": risco,
                 "Tendência": tendencia,
                 "Comentário": comentario,
                 "Earnings": earnings_str,
@@ -1199,7 +1145,7 @@ if st.session_state.get("executar_busca", False):
 
     if st.session_state.recomendacoes:
         st.subheader("📋 Tabela Final dos Ativos Selecionado")
-        df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
+        df_final = pd.DataFrame(st.session_state.recomendacoes)
         st.dataframe(df_final, use_container_width=True)
         st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
 
@@ -1284,7 +1230,6 @@ with st.expander("🕓 Histórico de Buscas"):
 __all__ = [
     "calcular_indicadores",
     "detectar_vcp",
-    "avaliar_risco",
     "classificar_tendencia",
     "gerar_comentario",
     "get_earnings_info_detalhado",
