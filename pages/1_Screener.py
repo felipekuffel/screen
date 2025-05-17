@@ -1087,29 +1087,35 @@ if executar:
             earnings_str, _, _ = get_earnings_info_detalhado(ticker)
 
             with st.container():
-                col1, col2 = st.columns([1,4])
+                st.subheader(f"{ticker} - {nome}")
+                col1, col2 = st.columns([3, 2])
+            
                 with col1:
-                    st.subheader(f"{ticker} - {nome}")
-                # Botão de Favoritar sem loop/rerun
+                    with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
+                        fig = plot_ativo(df, ticker, nome, vcp_detectado)
+                        st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}")
+            
                 with col2:
-                    with st.form(f"form_fav_{ticker}", clear_on_submit=False):
-                        comentario_key = f"coment_{ticker}"
-                        comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state.get(comentario_key, ""), key=comentario_key)
-                
-                        submitted = st.form_submit_button(f"⭐ Adicionar aos Favoritos {ticker}")
-                        if submitted:
-                            try:
-                                uid = st.session_state.user["localId"]
-                                fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
-                                fav_ref.set({
-                                    "ticker": ticker,
-                                    "nome": nome,
-                                    "comentario": comentario,
-                                    "adicionado_em": datetime.datetime.now().isoformat()
-                                })
-                                st.success(f"✅ {ticker} adicionado aos favoritos!")
-                            except Exception as e:
-                                st.error(f"Erro ao salvar favorito: {e}")
+                    comentario_key = f"coment_{ticker}"
+                    comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state.get(comentario_key, ""), key=comentario_key)
+            
+                    botao_fav_key = f"botao_fav_{ticker}"
+                    if st.button(f"⭐ Adicionar {ticker} aos Favoritos", key=botao_fav_key):
+                        try:
+                            uid = st.session_state.user["localId"]
+                            fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
+                            fav_ref.set({
+                                "ticker": ticker,
+                                "nome": nome,
+                                "comentario": comentario,
+                                "adicionado_em": datetime.datetime.now().isoformat()
+                            })
+                            st.session_state[f"sucesso_fav_{ticker}"] = True
+                        except Exception as e:
+                            st.error(f"Erro ao salvar favorito: {e}")
+            
+                    if st.session_state.get(f"sucesso_fav_{ticker}"):
+                        st.success(f"✅ {ticker} adicionado aos favoritos!")
                 col1, col2 = st.columns([3, 2])
 
                 with col1:
