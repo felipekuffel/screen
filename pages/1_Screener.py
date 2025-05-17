@@ -29,7 +29,7 @@ import json
 from streamlit_javascript import st_javascript
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
-import datetime
+from datetime import now
 st.set_page_config(layout="wide")
 
 # Inicializa Firebase Admin se ainda não foi inicializado
