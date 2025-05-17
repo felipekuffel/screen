@@ -1072,29 +1072,15 @@ if executar:
                         st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}")
             
                 with col2:
-                    comentario_key = f"coment_{ticker}"
-                    st.session_state.setdefault(comentario_key, "")
+                    # Checkbox para seleção
+                    marcado = st.checkbox(f"⭐ Marcar {ticker} para favoritos", key=f"chk_{ticker}")
+                    if "favoritos_selecionados" not in st.session_state:
+                        st.session_state.favoritos_selecionados = set()
                     
-                    with st.form(key=f"form_fav_{ticker}"):
-                        comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state[comentario_key], key=comentario_key)
-                        submitted = st.form_submit_button(f"⭐ Adicionar {ticker} aos Favoritos")
-                    
-                        if submitted:
-                            try:
-                                uid = st.session_state.user["localId"]
-                                fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
-                                fav_ref.set({
-                                    "ticker": ticker,
-                                    "nome": nome,
-                                    "comentario": comentario,
-                                    "adicionado_em": datetime.datetime.now().isoformat()
-                                })
-                                st.session_state[f"fav_sucesso_{ticker}"] = True
-                            except Exception as e:
-                                st.error(f"Erro ao salvar favorito: {e}")
-                    
-                    if st.session_state.get(f"fav_sucesso_{ticker}"):
-                        st.success(f"✅ {ticker} adicionado aos favoritos!")
+                    if marcado:
+                        st.session_state.favoritos_selecionados.add(ticker)
+                    else:
+                        st.session_state.favoritos_selecionados.discard(ticker)
                 col1, col2 = st.columns([3, 2])
 
                 with col1:
@@ -1210,7 +1196,32 @@ if executar:
 
     status_text.empty()
     progress.empty()
+    
+    if st.session_state.get("favoritos_selecionados"):
+    st.markdown("### ⭐ Adicionar selecionados aos Favoritos")
 
+    if st.button("✅ Confirmar favoritos selecionados"):
+        uid = st.session_state.user["localId"]
+        agora = datetime.datetime.now().isoformat()
+
+        for ticker in st.session_state.favoritos_selecionados:
+            try:
+                nome = yf.Ticker(ticker).info.get("shortName", ticker)
+                db.reference(f"favoritos/{uid}/{ticker}").set({
+                    "ticker": ticker,
+                    "nome": nome,
+                    "comentario": "",  # Você pode personalizar por ticker depois se quiser
+                    "adicionado_em": agora
+                })
+            except Exception as e:
+                st.warning(f"Erro ao adicionar {ticker}: {e}")
+
+        st.success("✅ Favoritos adicionados com sucesso!")
+        st.session_state.favoritos_selecionados.clear()
+    
+    
+    
+    
     if st.session_state.recomendacoes:
         st.subheader("📋 Tabela Final dos Ativos Selecionado")
         df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
