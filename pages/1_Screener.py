@@ -1070,14 +1070,14 @@ if executar:
             earnings_str, _, _ = get_earnings_info_detalhado(ticker)
 
             with st.container():
-                col1, col2 = st.columns([2,3])
+                col1, col2 = st.columns([1,4])
                 with col1:
                     st.subheader(f"{ticker} - {nome}")
                 # Botão de Favoritar sem loop/rerun
                 with col2: 
                     with st.form(key=f"form_fav_{ticker}"):
                         comentario_personalizado = st.text_input("📝 Comentário (opcional)", key=f"coment_{ticker}")
-                        submit_fav = st.form_submit_button("⭐ Adicionar aos Favoritos {ticker}")
+                        submit_fav = st.form_submit_button(f"⭐ Adicionar aos Favoritos {ticker}")
                         if submit_fav:
                             uid = st.session_state.user["localId"]
                             fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
@@ -1098,8 +1098,6 @@ if executar:
                 with col2:
                     st.markdown(comentario)
                     st.markdown(f"📅 **Resultado:** {earnings_str}")
-                    st.markdown(f"📉 **Risco:** `{risco}`")
-
                     rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns else None
                     if rs_val is not None and not pd.isna(rs_val):
                         st.markdown(f"💪 RS Rating (1 a 99): **{int(rs_val)}**")
@@ -1124,8 +1122,7 @@ if executar:
 
                     swing_high = df["High"].rolling(40).max().iloc[-1]
                     swing_low = df["Low"].rolling(40).min().iloc[-1]
-                    retracao_382 = swing_high - (swing_high - swing_low) * 0.382
-                    retracao_618 = swing_high - (swing_high - swing_low) * 0.618
+
 
                     indicadores = {
                         "SMA 20": df["SMA20"].iloc[-1],
@@ -1134,8 +1131,6 @@ if executar:
                         "SMA 200": df["SMA200"].iloc[-1],
                         "Máxima 52s": df["High"].rolling(252).max().iloc[-1],
                         "Mínima 52s": df["Low"].rolling(252).min().iloc[-1],
-                        "Retração 38.2% (últ. 40d)": retracao_382,
-                        "Retração 61.8% (últ. 40d)": retracao_618
                     }
 
                     for nome_ind, valor in indicadores.items():
@@ -1166,7 +1161,7 @@ if executar:
                         return [""] * len(row)
 
                     styled_table = df_niveis.style.apply(highlight_niveis, axis=1)
-                    st.dataframe(styled_table, use_container_width=True, height=565)
+                    st.dataframe(styled_table, use_container_width=True, height=450)
 
                     df_resultado = get_quarterly_growth_table_yfinance(ticker)
                     if df_resultado is not None:
