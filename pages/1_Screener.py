@@ -69,7 +69,31 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
 
+# Carrega filtros do Firebase para o usuário logado (após login verificado!)
+# Sempre recarrega os filtros do Firebase após login
+try:
+    uid = st.session_state.user["localId"]
+    snapshot = db.reference(f"filtros/{uid}").get()
+    st.session_state.filtros_salvos = snapshot if snapshot else {}
+except Exception as e:
+    st.session_state.filtros_salvos = {}
+    st.error(f"Erro ao carregar filtros do Firebase: {e}")
 
+if "salvar_favorito" in st.session_state:
+    try:
+        fav = st.session_state.pop("salvar_favorito")  # remove após usar
+        uid = st.session_state.user["localId"]
+        fav_ref = db.reference(f"favoritos/{uid}/{fav['ticker']}")
+        fav_ref.set({
+            "ticker": fav["ticker"],
+            "nome": fav["nome"],
+            "comentario": fav["comentario"],
+            "adicionado_em": datetime.datetime.now().isoformat()
+        })
+        st.success(f"✅ {fav['ticker']} adicionado aos favoritos!")
+    except Exception as e:
+        st.error(f"Erro ao salvar favorito: {e}")
+        
         
 # At the VERY TOP of your script, after imports:
 if st.session_state.get("reset_loader_selectbox_on_next_run", False):
@@ -977,7 +1001,14 @@ if "recarregar_tickers" in st.session_state:
 
 
 
-# ... (previous code) ...
+
+
+
+
+
+
+
+
 
 if executar:
     st.session_state.recomendacoes = []
@@ -1007,104 +1038,44 @@ if executar:
     else:
         status_text.text("✅ Ativos carregados.")
 
-    # Ensure tickers are unique to prevent duplicate keys for plots
-    raw_tickers = tickers_df['Ticker'].tolist()
-    # Preserve order of first appearance while ensuring uniqueness
-    tickers = list(dict.fromkeys(raw_tickers))
-    if len(raw_tickers) != len(tickers):
-        st.info(f"Nota: {len(raw_tickers) - len(tickers)} ticker(s) duplicado(s) foram removidos da lista do Finviz antes da análise.")
-
-    st.success(f"✅ {len(tickers)} ativos únicos carregados para análise.")
+    tickers = tickers_df['Ticker'].tolist()
+    st.success(f"✅ {len(tickers)} ativos carregados.")
 
     progress = st.progress(0)
     status_text = st.empty()
 
-    # Define highlight_niveis once if it's the same logic for both sections
-    # This is one of the versions of your highlight_niveis function.
-    # Ensure it's the one you want to use globally or adjust as needed.
-    def global_highlight_niveis(row):
-        nivel = row.name
-        if "Preço Atual" in nivel:
-            return ["background-color: #fff3b0; font-weight: bold;"] * len(row)
-        elif "🔺" in nivel: # Resistance
-            return ["color: #d62728; font-weight: bold;"] * len(row) # Red for resistance
-        elif "🔻" in nivel: # Support
-            return ["color: #2ca02c; font-weight: bold;"] * len(row) # Green for support
-        elif any(tag in nivel for tag in ["🟣", "📏", "📈", "📉"]): # SMAs, Retracements, Highs, Lows
-            return ["color: #9467bd; font-style: italic;"] * len(row) # Purple for indicators
-        return [""] * len(row)
-
-
-    for i, ticker in enumerate(tickers): # Iterating over unique tickers now
+    for i, ticker in enumerate(tickers):
         status_text.text(f"🔍 Analisando {ticker} ({i+1}/{len(tickers)})...")
         try:
             df = yf.download(ticker, period="18mo", interval="1d", progress=False)
-            if df.empty:
-                st.warning(f"⚠️ Não foram baixados dados para {ticker}. Pulando.")
-                continue
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.droplevel(1)
-            
-            # Ensure necessary columns exist after download, otherwise skip
-            required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-            if not all(col in df.columns for col in required_cols):
-                st.warning(f"⚠️ Dados incompletos para {ticker} (colunas faltando: {[c for c in required_cols if c not in df.columns]}). Pulando.")
-                continue
-            if df[required_cols].isnull().values.any():
-                 st.warning(f"⚠️ Dados para {ticker} contêm valores NaN em colunas OHLCV. Tentando preencher ou pulando.")
-                 df.ffill(inplace=True) # Forward fill NaNs
-                 df.bfill(inplace=True) # Backward fill remaining NaNs
-                 if df[required_cols].isnull().values.any():
-                     st.error(f"Não foi possível preencher todos os NaNs para {ticker}. Pulando.")
-                     continue
-
-
-            df = calcular_indicadores(df, dias_breakout, threshold_momentum) # Ensure threshold is correctly named, was 'threshold'
-            
-            # Check if df became empty or too short after calcular_indicadores
-            if df.empty or len(df) < max(200, dias_breakout): # SMA200 is the longest default, dias_breakout can be long
-                st.warning(f"⚠️ Dados insuficientes para {ticker} após calcular indicadores. Pulando.")
-                continue
-
+            df = calcular_indicadores(df, dias_breakout, threshold)
             try:
-                rs_rating_val = calcular_rs_rating(df, df_spy) # Renamed to avoid conflict
-                df['RS_Rating'] = rs_rating_val if rs_rating_val is not None else np.nan
+                df['RS_Rating'] = calcular_rs_rating(df, df_spy)
             except Exception as e:
                 st.warning(f"⚠️ Erro ao calcular RS Rating para {ticker}: {e}")
                 df['RS_Rating'] = np.nan
 
-            if ordenamento_mm:
-                # Check for NaN in moving averages before comparison
-                if df[['EMA20', 'SMA50', 'SMA150', 'SMA200']].isnull().iloc[-1].any() or \
-                   not (df['EMA20'].iloc[-1] > df['SMA50'].iloc[-1] > df['SMA150'].iloc[-1] > df['SMA200'].iloc[-1]):
-                    continue
-            
-            if sma200_crescente:
-                if pd.isna(df['SMA200'].iloc[-1]) or pd.isna(df['SMA200'].iloc[-30]) or \
-                   (len(df) < 30 or df['SMA200'].iloc[-1] <= df['SMA200'].iloc[-30]):
-                    continue
+            if ordenamento_mm and not (df['EMA20'].iloc[-1] > df['SMA50'].iloc[-1] > df['SMA150'].iloc[-1] > df['SMA200'].iloc[-1]):
+                continue
 
-            # Ensure lookback period is not out of bounds
-            actual_lookback = min(lookback_candles, len(df)) # was 'lookback'
-            if actual_lookback <= 0:
-                 st.warning(f"Período de lookback inválido ({actual_lookback}) para {ticker} após processamento. Pulando.")
-                 continue
+            if sma200_crescente and (len(df) < 30 or df['SMA200'].iloc[-1] <= df['SMA200'].iloc[-30]):
+                continue
 
-
-            momentum_cond = df['momentum_up'].iloc[-actual_lookback:].any()
-            breakout_cond = df['rompe_resistencia'].iloc[-actual_lookback:].any()
+            momentum_cond = df['momentum_up'].iloc[-lookback:].any()
+            breakout_cond = df['rompe_resistencia'].iloc[-lookback:].any()
             ambos_cond = momentum_cond and breakout_cond
 
             vcp_detectado = detectar_vcp(df)
             if mostrar_vcp and not vcp_detectado:
                 continue
 
-            current_sinal_filter = st.session_state.get("filtro_sinal", "Nenhum") # was 'sinal'
-            cond = False
-            if current_sinal_filter == "Momentum": cond = momentum_cond
-            elif current_sinal_filter == "Breakout": cond = breakout_cond
-            elif current_sinal_filter == "Momentum + Breakout": cond = ambos_cond
-            elif current_sinal_filter == "Nenhum": cond = True
+            match sinal:
+                case "Momentum": cond = momentum_cond
+                case "Breakout": cond = breakout_cond
+                case "Momentum + Breakout": cond = ambos_cond
+                case "Nenhum": cond = True
 
             if not cond:
                 continue
@@ -1118,371 +1089,154 @@ if executar:
             with st.container():
                 st.subheader(f"{ticker} - {nome}")
                 col1, col2 = st.columns([3, 2])
+            
+                with col1:
+                    with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
+                        fig = plot_ativo(df, ticker, nome, vcp_detectado)
+                        st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}")
+            
+                with col2:
+                    comentario_key = f"coment_{ticker}"
+                    comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state.get(comentario_key, ""), key=comentario_key)
+            
+                    botao_fav_key = f"botao_fav_{ticker}"
+                    if st.button(f"⭐ Adicionar {ticker} aos Favoritos", key=botao_fav_key):
+                        try:
+                            uid = st.session_state.user["localId"]
+                            fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
+                            fav_ref.set({
+                                "ticker": ticker,
+                                "nome": nome,
+                                "comentario": comentario,
+                                "adicionado_em": datetime.datetime.now().isoformat()
+                            })
+                            st.session_state[f"sucesso_fav_{ticker}"] = True
+                        except Exception as e:
+                            st.error(f"Erro ao salvar favorito: {e}")
+            
+                    if st.session_state.get(f"sucesso_fav_{ticker}"):
+                        st.success(f"✅ {ticker} adicionado aos favoritos!")
+                col1, col2 = st.columns([3, 2])
 
                 with col1:
                     with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
                         fig = plot_ativo(df, ticker, nome, vcp_detectado)
-                        st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}") # Key is now unique per ticker in this run
-                    marcado = st.checkbox(f"⭐ Marcar {ticker} para favoritos", key=f"chk_{ticker}")
-                    if "favoritos_selecionados" not in st.session_state:
-                        st.session_state.favoritos_selecionados = set()
-                    
-                    if marcado:
-                        st.session_state.favoritos_selecionados.add(ticker)
-                    else:
-                        st.session_state.favoritos_selecionados.discard(ticker)
+                        st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}")
 
                 with col2:
                     st.markdown(comentario)
                     st.markdown(f"📅 **Resultado:** {earnings_str}")
-                    st.markdown(f"📉 Risco (1 a 10): **{risco}**") # Added risk here as it was missing
-                    rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns and not df["RS_Rating"].empty else None
+                    rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns else None
                     if rs_val is not None and not pd.isna(rs_val):
                         st.markdown(f"💪 RS Rating (1 a 99): **{int(rs_val)}**")
                     else:
                         st.markdown("💪 RS Rating: ❌ Não disponível")
 
                     preco = df["Close"].iloc[-1]
-                    # Check if df is long enough for pivot points calculation (needs at least 2 rows)
-                    if len(df) >= 2:
-                        PP, suportes, resistencias = calcular_pivot_points(df)
-                        dists_resist = [(r, ((r - preco) / preco) * 100) for r in resistencias if r is not None]
-                        dists_suportes = [(s, ((s - preco) / preco) * 100) for s in suportes if s is not None]
+                    PP, suportes, resistencias = calcular_pivot_points(df)
+                    dists_resist = [(r, ((r - preco) / preco) * 100) for r in resistencias]
+                    dists_suportes = [(s, ((s - preco) / preco) * 100) for s in suportes]
 
-                        resist_ordenado = sorted([r for r in dists_resist if r[0] > preco], key=lambda x: x[0])[:3]
-                        suporte_ordenado = sorted([s for s in dists_suportes if s[0] < preco], key=lambda x: -x[0])[:3]
-                    else:
-                        resist_ordenado, suporte_ordenado = [], []
-                        st.warning(f"Dados insuficientes para calcular Pivot Points para {ticker}.")
-
+                    resist_ordenado = sorted([r for r in dists_resist if r[0] > preco], key=lambda x: x[0])[:3]
+                    suporte_ordenado = sorted([s for s in dists_suportes if s[0] < preco], key=lambda x: -x[0])[:3]
 
                     niveis = []
 
-                    for idx_r, (valor, _) in enumerate(resist_ordenado):
-                        niveis.append({"Nível": f"🔺 {idx_r + 1}ª Resistência", "Valor": valor})
+                    for i, (valor, _) in enumerate(resist_ordenado):
+                        niveis.append({"Nível": f"🔺 {i + 1}ª Resistência", "Valor": valor})
 
-                    for idx_s, (valor, _) in enumerate(suporte_ordenado):
-                        niveis.append({"Nível": f"🔻 {idx_s + 1}º Suporte", "Valor": valor})
-                    
-                    # Swing high/low and retracements need at least 40 days of data
-                    if len(df) >= 40:
-                        swing_high = df["High"].rolling(40).max().iloc[-1]
-                        swing_low = df["Low"].rolling(40).min().iloc[-1]
-                        # Retracements make sense if swing_high > swing_low
-                        if not pd.isna(swing_high) and not pd.isna(swing_low) and swing_high > swing_low:
-                             niveis.append({
-                                "Nível": "📏 Retração 38.2% (últ. 40d)",
-                                "Valor": swing_high - (swing_high - swing_low) * 0.382
-                            })
-                             niveis.append({
-                                "Nível": "📏 Retração 61.8% (últ. 40d)",
-                                "Valor": swing_high - (swing_high - swing_low) * 0.618
-                            })
-                    else:
-                        st.info(f"Dados insuficientes para cálculo de retrações de Fibonacci (40d) para {ticker}.")
+                    for i, (valor, _) in enumerate(suporte_ordenado):
+                        niveis.append({"Nível": f"🔻 {i + 1}º Suporte", "Valor": valor})
+
+                    swing_high = df["High"].rolling(40).max().iloc[-1]
+                    swing_low = df["Low"].rolling(40).min().iloc[-1]
 
 
-                    indicadores_map = {
-                        "SMA 20": ("SMA20", "🟣"), "SMA 50": ("SMA50", "🟣"),
-                        "SMA 150": ("SMA150", "🟣"), "SMA 200": ("SMA200", "🟣"),
-                        "Máxima 52s": (lambda d: d["High"].rolling(252).max().iloc[-1] if len(d) >= 252 else np.nan, "📈"),
-                        "Mínima 52s": (lambda d: d["Low"].rolling(252).min().iloc[-1] if len(d) >= 252 else np.nan, "📉"),
+                    indicadores = {
+                        "SMA 20": df["SMA20"].iloc[-1],
+                        "SMA 50": df["SMA50"].iloc[-1],
+                        "SMA 150": df["SMA150"].iloc[-1],
+                        "SMA 200": df["SMA200"].iloc[-1],
+                        "Máxima 52s": df["High"].rolling(252).max().iloc[-1],
+                        "Mínima 52s": df["Low"].rolling(252).min().iloc[-1],
                     }
 
-                    for nome_ind, (col_or_func, emoji) in indicadores_map.items():
-                        valor = np.nan
-                        if isinstance(col_or_func, str):
-                            if col_or_func in df.columns and not pd.isna(df[col_or_func].iloc[-1]):
-                                valor = df[col_or_func].iloc[-1]
-                        elif callable(col_or_func):
-                             try:
-                                valor = col_or_func(df)
-                             except Exception:
-                                valor = np.nan # Could fail if df is too short
-
-                        if not pd.isna(valor):
-                            niveis.append({"Nível": f"{emoji} {nome_ind}", "Valor": valor})
+                    for nome_ind, valor in indicadores.items():
+                        if "SMA" in nome_ind:
+                            nivel_nome = f"🟣 {nome_ind}"
+                        elif "Retração" in nome_ind:
+                            nivel_nome = f"📏 {nome_ind}"
+                        elif "Máxima" in nome_ind:
+                            nivel_nome = f"📈 {nome_ind}"
+                        elif "Mínima" in nome_ind:
+                            nivel_nome = f"📉 {nome_ind}"
                         else:
-                            st.info(f"Não foi possível calcular '{nome_ind}' para {ticker} (dados insuficientes ou NaN).")
-
+                            nivel_nome = nome_ind
+                        niveis.append({"Nível": nivel_nome, "Valor": valor})
 
                     df_niveis = inserir_preco_no_meio(niveis, preco)
-                    
-                    # Use the globally defined highlight function
-                    styled_table = df_niveis.style.apply(global_highlight_niveis, axis=1)
-                    st.dataframe(styled_table, use_container_width=True, height=450 if niveis else 100) # Adjust height if no levels
 
-                    df_resultado_growth = get_quarterly_growth_table_yfinance(ticker) # Renamed variable
-                    if df_resultado_growth is not None and not df_resultado_growth.empty:
+                    def highlight_niveis(row):
+                        nivel = row.name
+                        if "Preço Atual" in nivel:
+                            return ["background-color: #fff3b0; font-weight: bold;"] * len(row)
+                        elif "🔺" in nivel:
+                            return ["color: #1f77b4; font-weight: bold;"] * len(row)
+                        elif "🔻" in nivel:
+                            return ["color: #2ca02c; font-weight: bold;"] * len(row)
+                        elif any(tag in nivel for tag in ["🟣", "📏", "📈", "📉"]):
+                            return ["color: #9467bd; font-style: italic;"] * len(row)
+                        return [""] * len(row)
+
+                    styled_table = df_niveis.style.apply(highlight_niveis, axis=1)
+                    st.dataframe(styled_table, use_container_width=True, height=450)
+
+                    df_resultado = get_quarterly_growth_table_yfinance(ticker)
+                    if df_resultado is not None:
                         st.markdown("📊 **Histórico Trimestral (YoY)**")
-                        st.table(df_resultado_growth)
+                        st.table(df_resultado)
                     else:
-                        st.warning(f"❌ Histórico de crescimento YoY não disponível para {ticker}.")
+                        st.warning("❌ Histórico de crescimento YoY não disponível.")
 
 
-            # This block for st.session_state.recomendacoes.append should be outside the 'with col2:'
-            # but inside the main 'try:' for the ticker.
-            # It was indented too far under 'with col2:' previously.
-            # Calculation of dist_* variables
-            dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100 if not pd.isna(df["SMA20"].iloc[-1]) and preco else np.nan
-            dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100 if not pd.isna(df["SMA50"].iloc[-1]) and preco else np.nan
-            dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100 if not pd.isna(df["SMA200"].iloc[-1]) and preco else np.nan
-            
-            max52s_val = df["High"].rolling(252).max().iloc[-1] if len(df) >=252 else np.nan
-            min52s_val = df["Low"].rolling(252).min().iloc[-1] if len(df) >=252 else np.nan
 
-            dist_max52 = (preco - max52s_val) / preco * 100 if not pd.isna(max52s_val) and preco else np.nan
-            dist_min52 = (preco - min52s_val) / preco * 100 if not pd.isna(min52s_val) and preco else np.nan
 
+            preco = df["Close"].iloc[-1]
+            dist_sma20 = (preco - df["SMA20"].iloc[-1]) / preco * 100
+            dist_sma50 = (preco - df["SMA50"].iloc[-1]) / preco * 100
+            dist_sma200 = (preco - df["SMA200"].iloc[-1]) / preco * 100
+            dist_max52 = (preco - df["High"].rolling(252).max().iloc[-1]) / preco * 100
+            dist_min52 = (preco - df["Low"].rolling(252).min().iloc[-1]) / preco * 100
 
             st.session_state.recomendacoes.append({
-                "Ticker": ticker, "Empresa": nome, "Risco": risco, "Tendência": tendencia,
-                "Comentário": comentario, "Earnings": earnings_str,
+                "Ticker": ticker,
+                "Empresa": nome,
+                "Risco": risco,
+                "Tendência": tendencia,
+                "Comentário": comentario,
+                "Earnings": earnings_str,
                 "RS Rating": int(rs_val) if rs_val is not None and not pd.isna(rs_val) else "N/A",
-                "Dist % SMA20": f"{dist_sma20:+.1f}%" if not pd.isna(dist_sma20) else "N/A",
-                "Dist % SMA50": f"{dist_sma50:+.1f}%" if not pd.isna(dist_sma50) else "N/A",
-                "Dist % SMA200": f"{dist_sma200:+.1f}%" if not pd.isna(dist_sma200) else "N/A",
-                "Dist % Máx52s": f"{dist_max52:+.1f}%" if not pd.isna(dist_max52) else "N/A",
-                "Dist % Mín52s": f"{dist_min52:+.1f}%" if not pd.isna(dist_min52) else "N/A",
+                "Dist % SMA20": f"{dist_sma20:+.1f}%",
+                "Dist % SMA50": f"{dist_sma50:+.1f}%",
+                "Dist % SMA200": f"{dist_sma200:+.1f}%",
+                "Dist % Máx52s": f"{dist_max52:+.1f}%",
+                "Dist % Mín52s": f"{dist_min52:+.1f}%",
                 "Filtros": filtros_aplicados_str_legivel
             })
 
         except Exception as e:
-            st.error(f"☠️ Erro geral ao processar {ticker}: {e}") # Changed to st.error for more visibility
-            import traceback
-            st.error(traceback.format_exc())
-
+            st.warning(f"Erro com {ticker}: {e}")
 
         progress.progress(min((i + 1) / len(tickers), 1.0))
 
     status_text.empty()
     progress.empty()
-    
-    if st.session_state.get("favoritos_selecionados"):
-        st.markdown("### ⭐ Adicionar selecionados aos Favoritos")
-    
-        if st.button("✅ Confirmar favoritos selecionados"):
-            uid = st.session_state.user["localId"]
-            agora = datetime.datetime.now().isoformat() # Corrected library for datetime
-    
-            for ticker_fav in st.session_state.favoritos_selecionados: # Renamed variable
-                try:
-                    # It's better to fetch fresh info if needed, or retrieve from 'recomendacoes' if already there
-                    nome_fav = "Nome não encontrado"
-                    for rec in st.session_state.recomendacoes:
-                        if rec["Ticker"] == ticker_fav:
-                            nome_fav = rec["Empresa"]
-                            break
-                    if nome_fav == "Nome não encontrado": # Fallback if not in current recommendations
-                         ticker_info_fav = yf.Ticker(ticker_fav).info # Corrected variable name
-                         nome_fav = ticker_info_fav.get("shortName", ticker_fav)
 
-
-                    db.reference(f"favoritos/{uid}/{ticker_fav}").set({
-                        "ticker": ticker_fav,
-                        "nome": nome_fav,
-                        "comentario": "", 
-                        "adicionado_em": agora
-                    })
-                except Exception as e:
-                    st.warning(f"Erro ao adicionar {ticker_fav} aos favoritos: {e}")
-
-            st.success("✅ Favoritos adicionados com sucesso!")
-            st.session_state.favoritos_selecionados.clear()
-    
     if st.session_state.recomendacoes:
-        st.subheader("📋 Tabela Final dos Ativos Selecionados")
-        df_final_recs = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco") # Renamed variable
-        st.dataframe(df_final_recs, use_container_width=True)
-        st.download_button("⬇️ Baixar CSV", df_final_recs.to_csv(index=False).encode('utf-8'), file_name="recomendacoes_ia.csv") # Added utf-8 encoding
-
-# The rest of your script for saving history and displaying history expander
-# ... Make sure the global_highlight_niveis is also used in the "recarregar_tickers" section if needed.
-
-# In the "recarregar_tickers" section:
-if "recarregar_tickers" in st.session_state:
-    tickers_to_reload = st.session_state.pop("recarregar_tickers") # Renamed
-    # Ensure uniqueness here too, though keys are different, it's good practice
-    unique_tickers_to_reload = list(dict.fromkeys(tickers_to_reload))
-
-    st.session_state.recomendacoes = [] # This might be cleared, decide if you want to append or replace
-
-    progress_recarregar = st.progress(0)
-    status_text_recarregar = st.empty()
-
-    # Make sure global_highlight_niveis is defined before this block if you intend to use it here.
-    # If not already defined, you might need to define it or ensure it's in scope.
-    # For simplicity, assuming global_highlight_niveis is defined as above.
-
-    for i, ticker in enumerate(unique_tickers_to_reload): # Use unique list
-        status_text_recarregar.text(f"🔁 Recarregando {ticker} ({i+1}/{len(unique_tickers_to_reload)})...")
-        try:
-            df = yf.download(ticker, period="18mo", interval="1d", progress=False)
-            if df.empty:
-                st.warning(f"⚠️ Não foram baixados dados para recarregar {ticker}. Pulando.")
-                continue
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.droplevel(1)
-            
-            required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-            if not all(col in df.columns for col in required_cols):
-                st.warning(f"⚠️ Dados incompletos para recarregar {ticker}. Pulando.")
-                continue
-            if df[required_cols].isnull().values.any():
-                 df.ffill(inplace=True)
-                 df.bfill(inplace=True)
-                 if df[required_cols].isnull().values.any():
-                     st.error(f"Não foi possível preencher NaNs para recarregar {ticker}. Pulando.")
-                     continue
-
-            # Use the same parameter names as in the main execution block for consistency
-            df = calcular_indicadores(df, st.session_state.get("dias_breakout", 20), st.session_state.get("threshold_momentum", 0.07))
-
-            if df.empty or len(df) < 200:
-                st.warning(f"⚠️ Dados insuficientes para recarregar {ticker} após indicadores. Pulando.")
-                continue
-            
-            try:
-                rs_rating_val_reload = calcular_rs_rating(df, df_spy)
-                df["RS_Rating"] = rs_rating_val_reload if rs_rating_val_reload is not None else np.nan
-            except Exception as e:
-                st.warning(f"{ticker} com erro no RS Rating (recarregar): {e}")
-                df["RS_Rating"] = np.nan # Assign NaN on error
-                # continue # Decide if you want to skip or proceed with NaN RS Rating
-
-            vcp_detectado = detectar_vcp(df)
-            # Make sure 'nome' is defined here, e.g., from yf.Ticker(ticker).info
-            ticker_info_reload = yf.Ticker(ticker).info
-            nome_reload = ticker_info_reload.get("shortName", ticker)
-
-            risco = avaliar_risco(df)
-            tendencia = classificar_tendencia(df['Close'].tail(20))
-            comentario = gerar_comentario(df, risco, tendencia, vcp_detectado)
-            earnings_str, _, _ = get_earnings_info_detalhado(ticker)
-
-            with st.container():
-                st.subheader(f"{ticker} - {nome_reload}") # Use nome_reload
-                col1, col2 = st.columns([3, 2])
-                with col1:
-                    with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
-                        fig = plot_ativo(df, ticker, nome_reload, vcp_detectado) # Use nome_reload
-                        st.plotly_chart(fig, use_container_width=True, key=f"plot_reload_{ticker}") # Correct key
-                with col2:
-                    st.markdown(comentario)
-                    st.markdown(f"📅 **Resultado:** {earnings_str}")
-                    st.markdown(f"📉 Risco (1 a 10): **{risco}**")
-
-                    rs_val_reload_display = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns and not df["RS_Rating"].empty else None
-                    if rs_val_reload_display is not None and not pd.isna(rs_val_reload_display):
-                        st.markdown(f"💪 RS Rating (1 a 99): **{int(rs_val_reload_display)}**")
-                    else:
-                        st.markdown("💪 RS Rating: ❌ Não disponível")
-
-                    preco = df["Close"].iloc[-1]
-                    
-                    if len(df) >= 2:
-                        PP, suportes, resistencias = calcular_pivot_points(df)
-                        dists_resist = [(r, ((r - preco) / preco) * 100) for r in resistencias if r is not None]
-                        dists_suportes = [(s, ((s - preco) / preco) * 100) for s in suportes if s is not None]
-                        resist_ordenado = sorted([r for r in dists_resist if r[0] > preco], key=lambda x: x[0])[:3]
-                        suporte_ordenado = sorted([s for s in dists_suportes if s[0] < preco], key=lambda x: -x[0])[:3]
-                    else:
-                        resist_ordenado, suporte_ordenado = [], []
-
-                    niveis = []
-                    for i_r, (valor, _) in enumerate(resist_ordenado):
-                        niveis.append({"Nível": f"🔺 {i_r + 1}ª Resistência", "Valor": valor})
-                    for i_s, (valor, _) in enumerate(suporte_ordenado):
-                        niveis.append({"Nível": f"🔻 {i_s + 1}º Suporte", "Valor": valor})
-                    
-                    if len(df) >= 40:
-                        swing_high = df["High"].rolling(40).max().iloc[-1]
-                        swing_low = df["Low"].rolling(40).min().iloc[-1]
-                        if not pd.isna(swing_high) and not pd.isna(swing_low) and swing_high > swing_low:
-                             niveis.append({"Nível": "📏 Retração 38.2% (últ. 40d)", "Valor": swing_high - (swing_high - swing_low) * 0.382})
-                             niveis.append({"Nível": "📏 Retração 61.8% (últ. 40d)", "Valor": swing_high - (swing_high - swing_low) * 0.618})
-
-                    indicadores_map_reload = { # Copied map, ensure consistency or centralize
-                        "SMA 20": ("SMA20", "🟣"), "SMA 50": ("SMA50", "🟣"),
-                        "SMA 150": ("SMA150", "🟣"), "SMA 200": ("SMA200", "🟣"),
-                        "Máxima 52s": (lambda d: d["High"].rolling(252).max().iloc[-1] if len(d) >= 252 else np.nan, "📈"),
-                        "Mínima 52s": (lambda d: d["Low"].rolling(252).min().iloc[-1] if len(d) >= 252 else np.nan, "📉"),
-                    }
-                    for nome_ind, (col_or_func, emoji) in indicadores_map_reload.items():
-                        valor = np.nan
-                        if isinstance(col_or_func, str):
-                            if col_or_func in df.columns and not pd.isna(df[col_or_func].iloc[-1]):
-                                valor = df[col_or_func].iloc[-1]
-                        elif callable(col_or_func):
-                             try: valor = col_or_func(df)
-                             except Exception: valor = np.nan
-                        if not pd.isna(valor): niveis.append({"Nível": f"{emoji} {nome_ind}", "Valor": valor})
-
-
-                    df_niveis = inserir_preco_no_meio(niveis, preco)
-                    styled_table = df_niveis.style.apply(global_highlight_niveis, axis=1) # Use global highlight
-                    st.dataframe(styled_table, use_container_width=True, height=565 if niveis else 100)
-                    
-                    df_resultado_growth_reload = get_quarterly_growth_table_yfinance(ticker)
-                    if df_resultado_growth_reload is not None and not df_resultado_growth_reload.empty :
-                        st.markdown("📊 **Histórico Trimestral (YoY)**")
-                        st.table(df_resultado_growth_reload)
-                    else:
-                        st.warning(f"❌ Histórico de crescimento YoY não disponível para {ticker} (recarregar).")
-            
-            # Append to session_state.recomendacoes if needed for the reload section
-            # This was missing in your original "recarregar_tickers" block
-            dist_sma20_reload = (preco - df["SMA20"].iloc[-1]) / preco * 100 if not pd.isna(df["SMA20"].iloc[-1]) and preco else np.nan
-            # ... (calculate other dist_* for reload) ...
-            # Example, ensure all are calculated
-            dist_sma50_reload = (preco - df["SMA50"].iloc[-1]) / preco * 100 if not pd.isna(df["SMA50"].iloc[-1]) and preco else np.nan
-            dist_sma200_reload = (preco - df["SMA200"].iloc[-1]) / preco * 100 if not pd.isna(df["SMA200"].iloc[-1]) and preco else np.nan
-            max52s_val_reload = df["High"].rolling(252).max().iloc[-1] if len(df) >=252 else np.nan
-            min52s_val_reload = df["Low"].rolling(252).min().iloc[-1] if len(df) >=252 else np.nan
-            dist_max52_reload = (preco - max52s_val_reload) / preco * 100 if not pd.isna(max52s_val_reload) and preco else np.nan
-            dist_min52_reload = (preco - min52s_val_reload) / preco * 100 if not pd.isna(min52s_val_reload) and preco else np.nan
-
-
-            st.session_state.recomendacoes.append({
-                "Ticker": ticker, "Empresa": nome_reload, "Risco": risco, "Tendência": tendencia,
-                "Comentário": comentario, "Earnings": earnings_str,
-                "RS Rating": int(rs_val_reload_display) if rs_val_reload_display is not None and not pd.isna(rs_val_reload_display) else "N/A",
-                "Dist % SMA20": f"{dist_sma20_reload:+.1f}%" if not pd.isna(dist_sma20_reload) else "N/A",
-                "Dist % SMA50": f"{dist_sma50_reload:+.1f}%" if not pd.isna(dist_sma50_reload) else "N/A",
-                "Dist % SMA200": f"{dist_sma200_reload:+.1f}%" if not pd.isna(dist_sma200_reload) else "N/A",
-                "Dist % Máx52s": f"{dist_max52_reload:+.1f}%" if not pd.isna(dist_max52_reload) else "N/A",
-                "Dist % Mín52s": f"{dist_min52_reload:+.1f}%" if not pd.isna(dist_min52_reload) else "N/A",
-                "Filtros": "Recarregado de Histórico" # Or fetch original filters
-            })
-
-        except Exception as e:
-            st.warning(f"Erro ao recarregar {ticker}: {e}")
-            import traceback
-            st.error(traceback.format_exc()) # For detailed error during reload
-        
-        progress_recarregar.progress(min((i + 1) / max(1, len(unique_tickers_to_reload)), 1.0))
-
-    status_text_recarregar.empty()
-    progress_recarregar.empty()
-    # After reloading, you might want to display the st.session_state.recomendacoes as a table again
-    if st.session_state.recomendacoes:
-        st.subheader("📋 Tabela Final dos Ativos (Recarregados do Histórico)")
-        df_final_reloaded_recs = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
-        st.dataframe(df_final_reloaded_recs, use_container_width=True)
-        # Optionally offer download for reloaded data
-        st.download_button("⬇️ Baixar CSV (Recarregado)", df_final_reloaded_recs.to_csv(index=False).encode('utf-8'), file_name="recomendacoes_recarregadas.csv", key="download_reloaded")
-
-
-# ... (rest of the code) ...
-
-
-
-
-
-
-
-
-
+        st.subheader("📋 Tabela Final dos Ativos Selecionado")
+        df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
+        st.dataframe(df_final, use_container_width=True)
+        st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
 
 if executar:
     try:
@@ -1521,7 +1275,6 @@ if executar:
 
 
 with st.expander("🕓 Histórico de Buscas"):
-    uid = st.session_state.user["localId"]
     historico_ref = db.reference(f"historico_buscas/{uid}")
     historico = historico_ref.get()
 
