@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-from datetime import timedelta, timezone
+
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
@@ -1222,7 +1222,7 @@ if executar:
             return re.sub(r'[.$#\[\]/]', '_', s)
 
         filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
-        agora = datetime.now(timezone(timedelta(hours=-3)))
+        agora = datetime.datetimenow(datetime.timezone(datetime.timedelta(hours=-3)))
         timestamp = agora.strftime("%Y%m%d-%H%M")
         data_hora_legivel = agora.strftime("%d/%m %H:%M")
         filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
