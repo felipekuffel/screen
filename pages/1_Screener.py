@@ -1,4 +1,3 @@
-
     #st.title("Dashboard de Análise Técnica")
 import streamlit as st
 import yfinance as yf
@@ -9,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-
+from datetime import datetime, timedelta, timezone, date
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
@@ -29,9 +28,6 @@ import json
 from streamlit_javascript import st_javascript
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
-import datetime
-
-
 st.set_page_config(layout="wide")
 
 # Inicializa Firebase Admin se ainda não foi inicializado
@@ -79,22 +75,7 @@ except Exception as e:
     st.session_state.filtros_salvos = {}
     st.error(f"Erro ao carregar filtros do Firebase: {e}")
 
-if "salvar_favorito" in st.session_state:
-    try:
-        fav = st.session_state.pop("salvar_favorito")  # remove após usar
-        uid = st.session_state.user["localId"]
-        fav_ref = db.reference(f"favoritos/{uid}/{fav['ticker']}")
-        fav_ref.set({
-            "ticker": fav["ticker"],
-            "nome": fav["nome"],
-            "comentario": fav["comentario"],
-            "adicionado_em": datetime.datetime.now().isoformat()
-        })
-        st.success(f"✅ {fav['ticker']} adicionado aos favoritos!")
-    except Exception as e:
-        st.error(f"Erro ao salvar favorito: {e}")
-        
-        
+
 # At the VERY TOP of your script, after imports:
 if st.session_state.get("reset_loader_selectbox_on_next_run", False):
     # Check if the key actually exists in session_state before trying to set it
@@ -138,7 +119,7 @@ def get_earnings_info_detalhado(ticker):
             # Se for uma lista de datas, pegamos a primeira futura
             if isinstance(earnings, list) and earnings:
                 earnings = earnings[0]
-            if isinstance(earnings, (pd.Timestamp, datetime.datetime, datetime.date)):
+            if isinstance(earnings, (pd.Timestamp, datetime, date)):
                 earnings_date = pd.to_datetime(earnings).tz_localize("America/New_York") if pd.to_datetime(earnings).tzinfo is None else pd.to_datetime(earnings)
                 now = pd.Timestamp.now(tz="America/New_York")
                 delta = (earnings_date - now).days
@@ -745,8 +726,11 @@ with st.expander("Expandir/Minimizar Filtros", expanded=True):
         sma200_crescente = st.checkbox("📈 SMA200 maior que há 30 dias", value=st.session_state.get("sma200_crescente", False), key="sma200_crescente")
         mostrar_vcp = st.checkbox("🔍 Mostrar apenas ativos com padrão VCP", value=st.session_state.get("mostrar_vcp", False), key="mostrar_vcp")
 
-    executar = st.button("🔎 Iniciar Busca", type="primary")
+    if "executar_busca" not in st.session_state:
+        st.session_state.executar_busca = False
 
+    if st.button("🔎 Iniciar Busca", type="primary"):
+        st.session_state.executar_busca = True
 # REMOVED: The generic rerun_filtros logic. Reruns are handled by actions directly.
 # if st.session_state.get("rerun_filtros", False):
 # st.session_state["rerun_filtros"] = False
@@ -866,6 +850,8 @@ if "recarregar_tickers" in st.session_state:
 
             with st.container():
                 st.subheader(f"{ticker} - {nome}")
+                # Botão de Favoritar sem loop/rerun
+                
                 col1, col2 = st.columns([3, 2])
                 with col1:
                     with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
@@ -1010,7 +996,7 @@ if "recarregar_tickers" in st.session_state:
 
 
 
-if executar:
+if st.session_state.get("executar_busca", False):
     st.session_state.recomendacoes = []
 
     status_text = st.empty()
@@ -1046,6 +1032,7 @@ if executar:
 
     for i, ticker in enumerate(tickers):
         status_text.text(f"🔍 Analisando {ticker} ({i+1}/{len(tickers)})...")
+      
         try:
             df = yf.download(ticker, period="18mo", interval="1d", progress=False)
             if isinstance(df.columns, pd.MultiIndex):
@@ -1081,41 +1068,14 @@ if executar:
                 continue
 
             nome = yf.Ticker(ticker).info.get("shortName", ticker)
-            risco = avaliar_risco(df)
+
+            
             tendencia = classificar_tendencia(df['Close'].tail(20))
             comentario = gerar_comentario(df, risco, tendencia, vcp_detectado)
             earnings_str, _, _ = get_earnings_info_detalhado(ticker)
 
             with st.container():
                 st.subheader(f"{ticker} - {nome}")
-                col1, col2 = st.columns([3, 2])
-            
-                with col1:
-                    with st.spinner(f"📊 Carregando gráfico de {ticker}..."):
-                        fig = plot_ativo(df, ticker, nome, vcp_detectado)
-                        st.plotly_chart(fig, use_container_width=True, key=f"plot_{ticker}")
-            
-                with col2:
-                    comentario_key = f"coment_{ticker}"
-                    comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state.get(comentario_key, ""), key=comentario_key)
-            
-                    botao_fav_key = f"botao_fav_{ticker}"
-                    if st.button(f"⭐ Adicionar {ticker} aos Favoritos", key=botao_fav_key):
-                        try:
-                            uid = st.session_state.user["localId"]
-                            fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
-                            fav_ref.set({
-                                "ticker": ticker,
-                                "nome": nome,
-                                "comentario": comentario,
-                                "adicionado_em": datetime.datetime.now().isoformat()
-                            })
-                            st.session_state[f"sucesso_fav_{ticker}"] = True
-                        except Exception as e:
-                            st.error(f"Erro ao salvar favorito: {e}")
-            
-                    if st.session_state.get(f"sucesso_fav_{ticker}"):
-                        st.success(f"✅ {ticker} adicionado aos favoritos!")
                 col1, col2 = st.columns([3, 2])
 
                 with col1:
@@ -1126,6 +1086,8 @@ if executar:
                 with col2:
                     st.markdown(comentario)
                     st.markdown(f"📅 **Resultado:** {earnings_str}")
+                    st.markdown(f"📉 **Risco:** `{risco}`")
+
                     rs_val = df["RS_Rating"].iloc[-1] if "RS_Rating" in df.columns else None
                     if rs_val is not None and not pd.isna(rs_val):
                         st.markdown(f"💪 RS Rating (1 a 99): **{int(rs_val)}**")
@@ -1150,7 +1112,8 @@ if executar:
 
                     swing_high = df["High"].rolling(40).max().iloc[-1]
                     swing_low = df["Low"].rolling(40).min().iloc[-1]
-
+                    retracao_382 = swing_high - (swing_high - swing_low) * 0.382
+                    retracao_618 = swing_high - (swing_high - swing_low) * 0.618
 
                     indicadores = {
                         "SMA 20": df["SMA20"].iloc[-1],
@@ -1159,6 +1122,8 @@ if executar:
                         "SMA 200": df["SMA200"].iloc[-1],
                         "Máxima 52s": df["High"].rolling(252).max().iloc[-1],
                         "Mínima 52s": df["Low"].rolling(252).min().iloc[-1],
+                        "Retração 38.2% (últ. 40d)": retracao_382,
+                        "Retração 61.8% (últ. 40d)": retracao_618
                     }
 
                     for nome_ind, valor in indicadores.items():
@@ -1189,7 +1154,7 @@ if executar:
                         return [""] * len(row)
 
                     styled_table = df_niveis.style.apply(highlight_niveis, axis=1)
-                    st.dataframe(styled_table, use_container_width=True, height=450)
+                    st.dataframe(styled_table, use_container_width=True, height=565)
 
                     df_resultado = get_quarterly_growth_table_yfinance(ticker)
                     if df_resultado is not None:
@@ -1238,40 +1203,42 @@ if executar:
         st.dataframe(df_final, use_container_width=True)
         st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
 
-if executar:
-    try:
-        tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
+        # SALVA HISTÓRICO APÓS CONCLUSÃO
+        try:
+            tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
+            if not tickers_limpos:
+                st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
+            else:
+                def limpar_chave_firebase(s: str) -> str:
+                    return re.sub(r'[.$#\[\]/]', '_', s)
 
-        if not tickers_limpos:
-            st.warning("⚠️ Nenhum ticker válido para salvar. Operação cancelada.")
-            st.stop()
+                filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
+                agora = datetime.now(timezone(timedelta(hours=-3)))
+                timestamp = agora.strftime("%Y%m%d-%H%M")
+                filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
+                hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
+                nome_firebase_safe = f"{timestamp}_{hash_id}"
 
-        def limpar_chave_firebase(s: str) -> str:
-            return re.sub(r'[.$#\[\]/]', '_', s)
+                uid = st.session_state.user["localId"]
+                busca_ref = db.reference(f"historico_buscas/{uid}/{nome_firebase_safe}")
 
-        filtros_serializaveis = {limpar_chave_firebase(str(k)): str(v) for k, v in filters_dict.items()}
-        agora = pd.Timestamp.now(tz="America/Sao_Paulo")
-        timestamp = agora.strftime("%Y%m%d-%H%M")
-        data_hora_legivel = agora.strftime("%d/%m %H:%M")
-        filtros_aplicados_str = f"{st.session_state.get('filtro_sinal', '')} | {st.session_state.get('filtro_performance', '')} | {st.session_state.get('filtro_volume', '')}"
-        hash_id = hashlib.md5(filtros_aplicados_str.encode()).hexdigest()[:8]
-        nome_firebase_safe = f"{timestamp}_{hash_id}"
+                payload = {
+                    "tickers": tickers_limpos,
+                    "filtros": filtros_serializaveis,
+                    "nome_exibicao": filtros_aplicados_str
+                }
 
-        uid = st.session_state.user["localId"]
-        busca_ref = db.reference(f"historico_buscas/{uid}/{nome_firebase_safe}")
+                json.dumps(payload)  # validação
+                busca_ref.set(payload)
+                st.success("✅ Histórico salvo com sucesso!")
 
-        payload = {
-            "tickers": tickers_limpos,
-            "filtros": filtros_serializaveis,
-            "nome_exibicao": filtros_aplicados_str
-        }
-
-        json.dumps(payload)  # validação
-        busca_ref.set(payload)
-        st.success("✅ Histórico salvo com sucesso!")
-
-    except Exception as e:
-        st.error(f"❌ Erro ao salvar histórico: {e}")
+        except Exception as e:
+            st.error(f"❌ Erro ao salvar histórico: {e}")
+        finally:
+            st.session_state.executar_busca = False
+    else:
+        # Nenhuma recomendação = reset mesmo assim
+        st.session_state.executar_busca = False
 
 
 with st.expander("🕓 Histórico de Buscas"):
