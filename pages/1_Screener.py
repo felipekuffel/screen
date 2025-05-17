@@ -69,31 +69,7 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.link_button("🔐 Ir para Login", "/")
     st.stop()
 
-# Carrega filtros do Firebase para o usuário logado (após login verificado!)
-# Sempre recarrega os filtros do Firebase após login
-try:
-    uid = st.session_state.user["localId"]
-    snapshot = db.reference(f"filtros/{uid}").get()
-    st.session_state.filtros_salvos = snapshot if snapshot else {}
-except Exception as e:
-    st.session_state.filtros_salvos = {}
-    st.error(f"Erro ao carregar filtros do Firebase: {e}")
 
-if "salvar_favorito" in st.session_state:
-    try:
-        fav = st.session_state.pop("salvar_favorito")  # remove após usar
-        uid = st.session_state.user["localId"]
-        fav_ref = db.reference(f"favoritos/{uid}/{fav['ticker']}")
-        fav_ref.set({
-            "ticker": fav["ticker"],
-            "nome": fav["nome"],
-            "comentario": fav["comentario"],
-            "adicionado_em": datetime.datetime.now().isoformat()
-        })
-        st.success(f"✅ {fav['ticker']} adicionado aos favoritos!")
-    except Exception as e:
-        st.error(f"Erro ao salvar favorito: {e}")
-        
         
 # At the VERY TOP of your script, after imports:
 if st.session_state.get("reset_loader_selectbox_on_next_run", False):
@@ -1097,24 +1073,27 @@ if executar:
             
                 with col2:
                     comentario_key = f"coment_{ticker}"
-                    comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state.get(comentario_key, ""), key=comentario_key)
-            
-                    botao_fav_key = f"botao_fav_{ticker}"
-                    if st.button(f"⭐ Adicionar {ticker} aos Favoritos", key=botao_fav_key):
-                        try:
-                            uid = st.session_state.user["localId"]
-                            fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
-                            fav_ref.set({
-                                "ticker": ticker,
-                                "nome": nome,
-                                "comentario": comentario,
-                                "adicionado_em": datetime.datetime.now().isoformat()
-                            })
-                            st.session_state[f"sucesso_fav_{ticker}"] = True
-                        except Exception as e:
-                            st.error(f"Erro ao salvar favorito: {e}")
-            
-                    if st.session_state.get(f"sucesso_fav_{ticker}"):
+                    st.session_state.setdefault(comentario_key, "")
+                    
+                    with st.form(key=f"form_fav_{ticker}"):
+                        comentario = st.text_input("📝 Comentário (opcional)", value=st.session_state[comentario_key], key=comentario_key)
+                        submitted = st.form_submit_button(f"⭐ Adicionar {ticker} aos Favoritos")
+                    
+                        if submitted:
+                            try:
+                                uid = st.session_state.user["localId"]
+                                fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
+                                fav_ref.set({
+                                    "ticker": ticker,
+                                    "nome": nome,
+                                    "comentario": comentario,
+                                    "adicionado_em": datetime.datetime.now().isoformat()
+                                })
+                                st.session_state[f"fav_sucesso_{ticker}"] = True
+                            except Exception as e:
+                                st.error(f"Erro ao salvar favorito: {e}")
+                    
+                    if st.session_state.get(f"fav_sucesso_{ticker}"):
                         st.success(f"✅ {ticker} adicionado aos favoritos!")
                 col1, col2 = st.columns([3, 2])
 
