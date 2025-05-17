@@ -79,7 +79,22 @@ except Exception as e:
     st.session_state.filtros_salvos = {}
     st.error(f"Erro ao carregar filtros do Firebase: {e}")
 
-
+if "salvar_favorito" in st.session_state:
+    try:
+        fav = st.session_state.pop("salvar_favorito")  # remove após usar
+        uid = st.session_state.user["localId"]
+        fav_ref = db.reference(f"favoritos/{uid}/{fav['ticker']}")
+        fav_ref.set({
+            "ticker": fav["ticker"],
+            "nome": fav["nome"],
+            "comentario": fav["comentario"],
+            "adicionado_em": datetime.datetime.now().isoformat()
+        })
+        st.success(f"✅ {fav['ticker']} adicionado aos favoritos!")
+    except Exception as e:
+        st.error(f"Erro ao salvar favorito: {e}")
+        
+        
 # At the VERY TOP of your script, after imports:
 if st.session_state.get("reset_loader_selectbox_on_next_run", False):
     # Check if the key actually exists in session_state before trying to set it
@@ -1081,18 +1096,12 @@ if executar:
                     comentario_personalizado = st.text_input("📝 Comentário (opcional)", key=comentario_key)
                     
                     if st.button(f"⭐ Adicionar aos Favoritos {ticker}", key=f"fav_btn_{ticker}"):
-                        try:
-                            uid = st.session_state.user["localId"]
-                            fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
-                            fav_ref.set({
-                                "ticker": ticker,
-                                "nome": nome,
-                                "comentario": st.session_state[comentario_key],
-                                "adicionado_em": datetime.datetime.now().isoformat()
-                            })
-                            st.success(f"✅ {ticker} adicionado aos favoritos!")
-        except Exception as e:
-            st.error(f"Erro ao salvar favorito: {e}")
+                        st.session_state.salvar_favorito = {
+                            "ticker": ticker,
+                            "nome": nome,
+                            "comentario": st.session_state[comentario_key]
+                        }
+                        st.rerun()
                 col1, col2 = st.columns([3, 2])
 
                 with col1:
