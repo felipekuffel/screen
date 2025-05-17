@@ -1,3 +1,4 @@
+
     #st.title("Dashboard de Análise Técnica")
 import streamlit as st
 import yfinance as yf
@@ -8,7 +9,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 from plotly.subplots import make_subplots
-from datetime import datetime, timedelta, timezone, date
+from datetime import timedelta, timezone
 import pyrebase
 import firebase_admin
 from firebase_admin import credentials, auth as admin_auth, db
@@ -28,6 +29,7 @@ import json
 from streamlit_javascript import st_javascript
 from firebase_admin import credentials, auth as admin_auth, db
 import firebase_admin
+import datetime
 st.set_page_config(layout="wide")
 
 # Inicializa Firebase Admin se ainda não foi inicializado
@@ -119,7 +121,7 @@ def get_earnings_info_detalhado(ticker):
             # Se for uma lista de datas, pegamos a primeira futura
             if isinstance(earnings, list) and earnings:
                 earnings = earnings[0]
-            if isinstance(earnings, (pd.Timestamp, datetime, date)):
+            if isinstance(earnings, (pd.Timestamp, datetime.datetime, datetime.date)):
                 earnings_date = pd.to_datetime(earnings).tz_localize("America/New_York") if pd.to_datetime(earnings).tzinfo is None else pd.to_datetime(earnings)
                 now = pd.Timestamp.now(tz="America/New_York")
                 delta = (earnings_date - now).days
@@ -726,11 +728,8 @@ with st.expander("Expandir/Minimizar Filtros", expanded=True):
         sma200_crescente = st.checkbox("📈 SMA200 maior que há 30 dias", value=st.session_state.get("sma200_crescente", False), key="sma200_crescente")
         mostrar_vcp = st.checkbox("🔍 Mostrar apenas ativos com padrão VCP", value=st.session_state.get("mostrar_vcp", False), key="mostrar_vcp")
 
-    if "executar_busca" not in st.session_state:
-        st.session_state.executar_busca = False
+    executar = st.button("🔎 Iniciar Busca", type="primary")
 
-    if st.button("🔎 Iniciar Busca", type="primary"):
-        st.session_state.executar_busca = True
 # REMOVED: The generic rerun_filtros logic. Reruns are handled by actions directly.
 # if st.session_state.get("rerun_filtros", False):
 # st.session_state["rerun_filtros"] = False
@@ -994,7 +993,7 @@ if "recarregar_tickers" in st.session_state:
 
 
 
-if st.session_state.get("executar_busca", False):
+if executar:
     st.session_state.recomendacoes = []
 
     status_text = st.empty()
@@ -1071,7 +1070,24 @@ if st.session_state.get("executar_busca", False):
             earnings_str, _, _ = get_earnings_info_detalhado(ticker)
 
             with st.container():
-                st.subheader(f"{ticker} - {nome}")
+                col1, col2 = st.columns([2,3])
+                with col1:
+                    st.subheader(f"{ticker} - {nome}")
+                # Botão de Favoritar sem loop/rerun
+                with col2: 
+                    with st.form(key=f"form_fav_{ticker}"):
+                        comentario_personalizado = st.text_input("📝 Comentário (opcional)", key=f"coment_{ticker}")
+                        submit_fav = st.form_submit_button("⭐ Adicionar aos Favoritos {ticker}")
+                        if submit_fav:
+                            uid = st.session_state.user["localId"]
+                            fav_ref = db.reference(f"favoritos/{uid}/{ticker}")
+                            fav_ref.set({
+                                "ticker": ticker,
+                                "nome": nome,
+                                "comentario": comentario_personalizado,
+                                "adicionado_em": datetime.now().isoformat()
+                            })
+                            st.success(f"✅ {ticker} adicionado aos favoritos!")
                 col1, col2 = st.columns([3, 2])
 
                 with col1:
@@ -1198,10 +1214,8 @@ if st.session_state.get("executar_busca", False):
         df_final = pd.DataFrame(st.session_state.recomendacoes).sort_values(by="Risco")
         st.dataframe(df_final, use_container_width=True)
         st.download_button("⬇️ Baixar CSV", df_final.to_csv(index=False).encode(), file_name="recomendacoes_ia.csv")
-st.session_state.executar_busca = False
 
-
-if st.session_state.get("executar_busca", False):
+if executar:
     try:
         tickers_limpos = [r["Ticker"] for r in st.session_state.recomendacoes if "Ticker" in r]
 
@@ -1235,7 +1249,6 @@ if st.session_state.get("executar_busca", False):
 
     except Exception as e:
         st.error(f"❌ Erro ao salvar histórico: {e}")
-st.session_state.executar_busca = False
 
 
 with st.expander("🕓 Histórico de Buscas"):
